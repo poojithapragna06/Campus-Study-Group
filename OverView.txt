@@ -1,0 +1,21 @@
+12 Campus Study Group and Collaboration Platform
+12.1 Project Overview
+Students often look for peers to study with or collaborate on assignments. Currently, there is no centralized system to find study partners.
+The system should allow students to create and join study groups.
+12.2 User Features
+Students should be able to:
+• Create study groups
+• Join existing groups
+• Schedule group study sessions
+• Share files and notes
+12.3 Admin Features
+Administrators should be able to:
+• Monitor group activities
+• Remove inappropriate content
+12.4 Suggested Technologies
+• Real-time chat systems
+• File sharing APIs
+12.5 Deliverables
+• Study group web application
+• Chat and collaboration tools
+• Admin dashboard
