@@ -8,7 +8,6 @@ const groupChatSchema = new mongoose.Schema({
     group_contents: [{type:String}],
     messages: [
             {
-                message_id : {type:String,required:true},
                 sender_id : {type:String,required:true},
                 content : {type:String},
                 fetchables : [{type:String}],
