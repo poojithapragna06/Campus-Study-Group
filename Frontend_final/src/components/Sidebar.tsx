@@ -7,6 +7,7 @@ interface SidebarProps {
   setActiveView: (v: ActiveView) => void;
   currentUser: User;
   onRoleSwitch: () => void;
+  onLogout: () => void;
 }
 
 const navItems = [
@@ -17,7 +18,7 @@ const navItems = [
   { id: 'files' as ActiveView, label: 'Shared Files', icon: FolderOpen },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, currentUser, onRoleSwitch }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, currentUser, onRoleSwitch, onLogout }) => {
   return (
     <aside className="w-64 flex flex-col h-screen sticky top-0" style={{ background: '#111827', borderRight: '1px solid #1E2A3A' }}>
       {/* Logo */}
@@ -93,6 +94,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, currentUse
         >
           <LogOut size={13} />
           Switch to {currentUser.role === 'admin' ? 'Student' : 'Admin'} View
+        </button>
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all duration-200 hover:opacity-80"
+          style={{ color: '#EF4444', background: 'transparent' }}
+        >
+          <LogOut size={13} />
+          Sign out
         </button>
       </div>
     </aside>
