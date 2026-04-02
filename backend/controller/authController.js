@@ -4,7 +4,12 @@ import jwt from 'jsonwebtoken';
 export async function loginHandler(req, res) {
     try {
         const { email, password } = req.body;
-        const users = await sql`SELECT * FROM users WHERE email = ${email}`;
+        console.log(email, password);
+        const users = await sql`SELECT * FROM users WHERE email = ${(email)}`;
+        for(const row of users){
+    console.log(row.username);
+}
+console.log(users.length)
         if (users.length === 0) {
             return res.status(400).json({
                 status: 'error',

@@ -7,6 +7,7 @@ export async function connectToDatabase() {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });
+        console.log("mongoURI",mongoURI);
         console.log('Connected to MongoDB successfully');
     } catch (error) {
         console.error('Error connecting to MongoDB:', error);
