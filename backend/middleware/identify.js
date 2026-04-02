@@ -2,6 +2,7 @@ import { sql } from "../dbUtils/sql_utl/sql_connector.js";
 import jwt from 'jsonwebtoken';
 export async function identify(req,res,next) {
     const authHeader = req.headers['authorization'];
+    console.log(authHeader);
     if (!authHeader) {
         return res.status(401).json({ error: 'Authorization header missing' });
     }
@@ -20,6 +21,6 @@ export async function identify(req,res,next) {
         return next(); 
     } catch (err) {
         console.error(err);
-        return res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({ error: 'Invalid token',token:token });
     }
 }

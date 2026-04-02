@@ -16,4 +16,11 @@ router.get('/me',identify,(req,res)=>{
         Uid: req.user.userID
     })
 })
+router.get('/online',(req,res)=>{
+    res.status(200).json({
+        status: 'success',
+        message: 'user authenticated',
+       
+    })
+})
 export default router;
