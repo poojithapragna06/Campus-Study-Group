@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { Search, Plus, Lock, Users, ChevronRight, Tag, X, BookOpen } from 'lucide-react';
-import { currentUser } from '../data/mockData';
+import { Search, Plus, Lock, Users, ChevronRight, Tag, X, BookOpen, Compass } from 'lucide-react';
 import { ActiveView } from '../types';
-import { useMyRealGroups, useJoinGroup, useSearchGroups } from '../hooks/useQueries';
+import { useMyRealGroups, useAllGroups, useJoinGroup, useSearchGroups } from '../hooks/useQueries';
 import { LoadingGrid, ErrorState, MutationButton } from './ui';
 import { RealGroupChat } from '../types';
 interface StudyGroupsProps {
   setActiveView: (v: ActiveView) => void;
- setSelectedGroup: (g: RealGroupChat | null) => void;
+  setSelectedGroup: (g: RealGroupChat | null) => void;
 }
 
 // Fixed color palette by index since backend has no coverColor
@@ -26,12 +25,16 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  const { data: groupsRes, isLoading, isError, refetch } = useMyRealGroups();
+  const [activeTab, setActiveTab] = useState<'my' | 'discover'>('my');
+
+  const { data: myGroupsRes, isLoading: myLoading, isError: myError, refetch: myRefetch } = useMyRealGroups();
+  const { data: allGroupsRes, isLoading: allLoading, isError: allError, refetch: allRefetch } = useAllGroups();
   const groupSearch = useSearchGroups(search);
 
-  const groups: any[] = groupsRes?.result ?? [];
+  const myGroups: any[] = myGroupsRes?.result ?? [];
+  const allGroups: any[] = allGroupsRes?.result ?? [];
 
-  // Use real search results when query >= 2 chars, else show all groups
+  // Use real search results when query >= 2 chars, else show groups based on active tab
   const displayGroups: any[] =
     search.length >= 2
       ? (groupSearch.data?.result
@@ -39,10 +42,23 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
             ? groupSearch.data.result
             : [groupSearch.data.result]
           : [])
-      : groups;
+      : (activeTab === 'discover' ? allGroups : myGroups);
+
+  const isLoading = activeTab === 'discover' ? allLoading : myLoading;
+  const isError = activeTab === 'discover' ? allError : myError;
+  const refetch = activeTab === 'discover' ? allRefetch : myRefetch;
+
+  const currentUserId = (() => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return '';
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return String(payload.Uid);
+    } catch { return ''; }
+  })();
 
   const handleCreate = async () => {
-    if (!newGroup.name || !newGroup.subject) return;
+    if (!newGroup.name) return;
     setCreateLoading(true);
     setCreateError('');
     try {
@@ -85,21 +101,46 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
         </button>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search
-            size={15}
-            className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: '#4A5A70' }}
-          />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search groups by name…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none"
-            style={{ background: '#1E2A3A', border: '1px solid #2A3A50', color: '#E8EDF4' }}
-          />
+      {/* Search and Tabs */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 relative">
+            <Search
+              size={15}
+              className="absolute left-4 top-1/2 -translate-y-1/2"
+              style={{ color: '#4A5A70' }}
+            />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search groups by name…"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: '#1E2A3A', border: '1px solid #2A3A50', color: '#E8EDF4' }}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('my')}
+            className="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2"
+            style={{ 
+              background: activeTab === 'my' ? '#2A3A50' : 'transparent',
+              color: activeTab === 'my' ? '#FFF' : '#6B7A8D' 
+            }}
+          >
+            <BookOpen size={16} /> My Groups
+          </button>
+          <button
+            onClick={() => setActiveTab('discover')}
+            className="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2"
+            style={{ 
+              background: activeTab === 'discover' ? '#2A3A50' : 'transparent',
+              color: activeTab === 'discover' ? '#FFF' : '#6B7A8D' 
+            }}
+          >
+            <Compass size={16} /> Discover
+          </button>
         </div>
       </div>
 
@@ -125,6 +166,7 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
               key={group._id}
               group={group}
               color={getColor(index)}
+              currentUserId={currentUserId}
               onOpen={() => {
                 setSelectedGroup(group as RealGroupChat);
                 setActiveView('chat');
@@ -167,7 +209,6 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
             <div className="space-y-4">
               {[
                 { label: 'Group Name', key: 'name', placeholder: 'e.g. Algorithms Study Circle' },
-                { label: 'Subject', key: 'subject', placeholder: 'e.g. Computer Science' },
               ].map(({ label, key, placeholder }) => (
                 <div key={key}>
                   <label
@@ -185,23 +226,6 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
                   />
                 </div>
               ))}
-
-              <div>
-                <label
-                  className="block text-xs font-medium mb-1.5"
-                  style={{ color: '#6B7A8D' }}
-                >
-                  Description
-                </label>
-                <textarea
-                  value={newGroup.description}
-                  onChange={e => setNewGroup(p => ({ ...p, description: e.target.value }))}
-                  placeholder="What will your group focus on?"
-                  rows={3}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none"
-                  style={{ background: '#111827', border: '1px solid #2A3A50', color: '#E8EDF4' }}
-                />
-              </div>
 
               <div
                 className="flex items-center justify-between p-3 rounded-xl"
@@ -239,12 +263,12 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
                 label="Create Group"
                 pendingLabel="Creating…"
                 onClick={handleCreate}
-                disabled={!newGroup.name || !newGroup.subject}
+                disabled={!newGroup.name}
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium"
                 style={{
                   background: '#FFB800',
                   color: '#0D0D0D',
-                  opacity: !newGroup.name || !newGroup.subject ? 0.5 : 1,
+                  opacity: !newGroup.name ? 0.5 : 1,
                 }}
               />
             </div>
@@ -255,22 +279,33 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
   );
 };
 
-// ─── GroupCard ────────────────────────────────────────────────────────────────
+// --- GroupCard ---
 
-const GroupCard: React.FC<{ group: any; color: string; onOpen: () => void }> = ({
+const GroupCard: React.FC<{ group: any; color: string; currentUserId: string; onOpen: () => void }> = ({
   group,
   color,
+  currentUserId,
   onOpen,
 }) => {
   const joinGroup = useJoinGroup();
+  const [requestSent, setRequestSent] = React.useState(false);
 
   // Backend stores member IDs as strings in group_members array
   const isJoined: boolean = Array.isArray(group.group_members)
-    ? group.group_members.includes(currentUser.id)
+    ? group.group_members.includes(currentUserId)
     : false;
 
   const memberCount: number = group.group_members?.length ?? 0;
   const isPrivate: boolean = group.requires_permission === true;
+
+  const handleJoin = () => {
+    joinGroup.mutate(group._id, {
+      onSuccess: (data) => {
+        // if private, it doesn't immediately add to group_members, it just sends a request
+        if (isPrivate) setRequestSent(true);
+      }
+    });
+  };
 
   return (
     <div
@@ -322,25 +357,27 @@ const GroupCard: React.FC<{ group: any; color: string; onOpen: () => void }> = (
 
         <div className="flex gap-2">
           <button
-            onClick={() => joinGroup.mutate(group._id)}
-            disabled={joinGroup.isPending || isJoined}
+            onClick={handleJoin}
+            disabled={joinGroup.isPending || isJoined || requestSent}
             className="flex-1 py-2 rounded-xl text-xs font-medium transition-all duration-200"
             style={{
-              background: isJoined ? 'rgba(255,184,0,0.1)' : '#FFB800',
-              color: isJoined ? '#FFB800' : '#0D0D0D',
-              border: isJoined ? '1px solid #FFB800' : 'none',
+              background: (isJoined || requestSent) ? 'rgba(255,184,0,0.1)' : '#FFB800',
+              color: (isJoined || requestSent) ? '#FFB800' : '#0D0D0D',
+              border: (isJoined || requestSent) ? '1px solid #FFB800' : 'none',
               opacity: joinGroup.isPending ? 0.7 : 1,
             }}
           >
-            {joinGroup.isPending ? 'Joining...' : isJoined ? 'Joined \u2713' : 'Join Group'}
+            {joinGroup.isPending ? 'Joining...' : isJoined ? 'Joined \u2713' : requestSent ? 'Request Sent' : 'Join Group'}
           </button>
-          <button
-            onClick={onOpen}
-            className="flex items-center justify-center w-9 h-8 rounded-xl"
-            style={{ background: '#1E2A3A', color: '#6B7A8D', border: '1px solid #2A3A50' }}
-          >
-            <ChevronRight size={14} />
-          </button>
+          {isJoined && (
+            <button
+              onClick={onOpen}
+              className="flex items-center justify-center w-9 h-8 rounded-xl"
+              style={{ background: '#1E2A3A', color: '#6B7A8D', border: '1px solid #2A3A50' }}
+            >
+              <ChevronRight size={14} />
+            </button>
+          )}
         </div>
       </div>
     </div>

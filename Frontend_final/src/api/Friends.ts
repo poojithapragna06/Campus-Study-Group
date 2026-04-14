@@ -17,8 +17,18 @@ export async function apiFetchFriendRequests() {
     headers: { 'Content-Type': 'application/json' , Authorization: `Bearer ${token}`,},
   });
 
-  
   if (!res.ok) throw new Error('Failed to fetch requests');
+  return res.json();
+}
+
+export async function apiFetchSentFriendRequests() {
+  const token = localStorage.getItem("token");
+  const res = await fetch('http://localhost:5000/api/friends/sentrequests', {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch sent requests');
   return res.json();
 }
 

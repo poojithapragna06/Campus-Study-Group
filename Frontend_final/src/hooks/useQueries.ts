@@ -4,6 +4,8 @@ import { StudyGroup, StudySession, Message, SharedFile } from '../types';
 import * as friendsApi from '../api/Friends';
 import * as groupsApi from '../api/groups';
 import { apiCreateGroup, apiDeleteGroup } from '../api/groups';
+import * as privateChatApi from '../api/privateChat';
+import * as sessionsApi from '../api/sessions';
 // ─── Query Keys (typed constants) ─────────────────────────────────────────────
 export const QK = {
   groups: ['groups'] as const,
@@ -14,13 +16,17 @@ export const QK = {
   users: ['users'] as const,
   stats: (userId: string) => ['stats', userId] as const,
   friends:        ['friends'] as const,
-friendRequests: ['friendRequests'] as const,
-userSearch:     (q: string) => ['userSearch', q] as const,
-myGroups:       ['myGroups'] as const,
-adminGroups:    ['adminGroups'] as const,
-realGroupChat:  (id: string) => ['realGroupChat', id] as const,
-joinRequests:   (groupId: string) => ['joinRequests', groupId] as const,
-groupSearch:    (q: string) => ['groupSearch', q] as const,
+  friendRequests: ['friendRequests'] as const,
+  sentFriendRequests: ['sentFriendRequests'] as const,
+  userSearch:     (q: string) => ['userSearch', q] as const,
+  myGroups:       ['myGroups'] as const,
+  adminGroups:    ['adminGroups'] as const,
+  realGroupChat:  (id: string) => ['realGroupChat', id] as const,
+  joinRequests:   (groupId: string) => ['joinRequests', groupId] as const,
+  groupSearch:    (q: string) => ['groupSearch', q] as const,
+  privateChat:    (friendId: string) => ['privateChat', friendId] as const,
+  realSessions:   ['realSessions'] as const,
+  allGroups:      ['allGroups'] as const,
 };
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
@@ -208,6 +214,15 @@ export function useFriendRequests() {
   return useQuery({
     queryKey: QK.friendRequests,
     queryFn: friendsApi.apiFetchFriendRequests,
+    refetchInterval: 10000, // refresh every 10s
+  });
+}
+
+export function useSentFriendRequests() {
+  return useQuery({
+    queryKey: QK.sentFriendRequests,
+    queryFn: friendsApi.apiFetchSentFriendRequests,
+    refetchInterval: 10000, // refresh every 10s
   });
 }
 
@@ -256,6 +271,13 @@ export function useMyRealGroups() {
   return useQuery({
     queryKey: QK.myGroups,
     queryFn: groupsApi.apiFetchMyGroups,
+  });
+}
+
+export function useAllGroups() {
+  return useQuery({
+    queryKey: QK.allGroups,
+    queryFn: groupsApi.apiFetchAllGroups,
   });
 }
 
@@ -345,3 +367,76 @@ export function useDeleteRealGroup() {
 // useJoinGroup already exists — update the body field name:
 // OLD: body: JSON.stringify({ group_chat_id: groupChatId })
 // NEW: body: JSON.stringify({ groupChatId })           ← controller reads req.body.groupChatId
+
+// ─── Private Chat ─────────────────────────────────────────────────────────────
+
+export function usePrivateChat(friendId: string) {
+  return useQuery({
+    queryKey: QK.privateChat(friendId),
+    queryFn: () => privateChatApi.apiFetchPrivateChat(friendId),
+    enabled: !!friendId,
+    refetchInterval: 5000,
+  });
+}
+
+export function useSendPrivateMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ friendId, content }: { friendId: string; content: string }) =>
+      privateChatApi.apiSendPrivateMessage(friendId, content),
+    onSuccess: (_, { friendId }) => {
+      qc.invalidateQueries({ queryKey: QK.privateChat(friendId) });
+    },
+  });
+}
+
+export function useUploadFileMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ friendId, file }: { friendId: string; file: File }) =>
+      privateChatApi.apiUploadFileMessage(friendId, file),
+    onSuccess: (_, { friendId }) => {
+      qc.invalidateQueries({ queryKey: QK.privateChat(friendId) });
+    },
+  });
+}
+
+// ─── Real Sessions ────────────────────────────────────────────────────────────
+
+export function useRealSessions() {
+  return useQuery({
+    queryKey: QK.realSessions,
+    queryFn: sessionsApi.apiFetchMySessions,
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useCreateRealSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: sessionsApi.SessionPayload) => sessionsApi.apiCreateSession(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.realSessions });
+    },
+  });
+}
+
+export function useRsvpRealSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => sessionsApi.apiRsvpSession(sessionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.realSessions });
+    },
+  });
+}
+
+export function useDeleteRealSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => sessionsApi.apiDeleteSession(sessionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.realSessions });
+    },
+  });
+}

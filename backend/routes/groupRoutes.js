@@ -9,9 +9,12 @@ import {
     get_groupChat_chat,
     accept_join_request,
     get_join_requests_for_my_group,
-    get_groups_by_id_then_semantically,
     create_groupChat,
-    delete_groupChat
+    delete_groupChat,
+    send_message,
+    leave_groupChat,
+    get_all_groups,
+    get_groups_by_id_then_semantically
 } from "../controller/groupChatController.js";
 
 const router = express.Router();
@@ -22,9 +25,13 @@ router.post("/create-group",create_groupChat);
 
 // router.post("delete-post")
 
-router.post("delete-group",delete_groupChat);
+router.post("/delete-group",delete_groupChat);
 
 router.post("/join", join_groupChat);
+
+router.post("/leave", leave_groupChat);
+
+router.get("/all", get_all_groups);
 
 router.get("/admin", get_groupChats_where_I_am_admin);
 
@@ -37,5 +44,7 @@ router.post("/accept-request", accept_join_request);
 router.post("/requests", get_join_requests_for_my_group);
 
 router.post("/search", get_groups_by_id_then_semantically);
+
+router.post("/message", send_message);
 
 export default router;
