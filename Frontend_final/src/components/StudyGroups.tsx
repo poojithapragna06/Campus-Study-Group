@@ -4,10 +4,10 @@ import { currentUser } from '../data/mockData';
 import { ActiveView } from '../types';
 import { useMyRealGroups, useJoinGroup, useSearchGroups } from '../hooks/useQueries';
 import { LoadingGrid, ErrorState, MutationButton } from './ui';
-
+import { RealGroupChat } from '../types';
 interface StudyGroupsProps {
   setActiveView: (v: ActiveView) => void;
-  setSelectedGroup: (g: any) => void;
+ setSelectedGroup: (g: RealGroupChat | null) => void;
 }
 
 // Fixed color palette by index since backend has no coverColor
@@ -46,13 +46,13 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
     setCreateLoading(true);
     setCreateError('');
     try {
-      const res = await fetch('/api/groups/create', {
+      const res = await fetch('http://localhost:5000/api/groups/create-group', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' ,authorization: `Bearer ${localStorage.getItem('token')}`},
         body: JSON.stringify({
           group_name: newGroup.name,
-          subject: newGroup.subject,
-          description: newGroup.description,
+           subject: newGroup.subject,
+           description: newGroup.description,
           requires_permission: newGroup.isPrivate,
         }),
       });
@@ -126,7 +126,7 @@ const StudyGroups: React.FC<StudyGroupsProps> = ({ setActiveView, setSelectedGro
               group={group}
               color={getColor(index)}
               onOpen={() => {
-                setSelectedGroup(group);
+                setSelectedGroup(group as RealGroupChat);
                 setActiveView('chat');
               }}
             />
@@ -309,7 +309,7 @@ const GroupCard: React.FC<{ group: any; color: string; onOpen: () => void }> = (
           {group.group_name}
         </h3>
         <p className="text-xs mb-3 line-clamp-2" style={{ color: '#4A5A70' }}>
-          {group.description ?? 'No description provided.'}
+          {group.group_description ?? 'No description provided.'}
         </p>
 
         {/* member count */}

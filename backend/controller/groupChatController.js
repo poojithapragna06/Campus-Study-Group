@@ -1,9 +1,8 @@
 import { GroupChat } from "../models/groupChat.js";
 import { sql } from "../dbUtils/sql_utl/sql_connector.js";
-import redis from "../dbUtils/redisConnect.js";
 export async function join_groupChat(req,res){
     try {
-        const user_id = req.user.userId
+        const user_id = req.user.userID
         const groupChatId = req.body.groupChatId
         if (!groupChatId) {
             return res.status(400).json({
@@ -91,7 +90,7 @@ export async function join_groupChat(req,res){
 export async function get_groupChats_where_I_am_admin(req,res){
     try {
         // userId is a string not a mongoose Id object 
-    const userId = req.user.userId;
+    const userId = req.user.userID;
     if (!userId) {
         return res.status(400).json({
             error: "userId is required",
@@ -124,7 +123,7 @@ export async function get_groupChats_where_I_am_admin(req,res){
 
 export async function get_my_groupChats(req,res){
     try{
-        const userId  = req.user.userId;
+        const userId  = req.user.userID;
         if (!userId) {
             return res.status(400).json({
                 error: "userId is required",
@@ -157,7 +156,7 @@ export async function get_my_groupChats(req,res){
 
 export async function get_groupChat_chat(req,res) {
     try {
-        const userId = req.user.userId;
+        const userId = req.user.userID;
         const groupId = req.body.group_id;
         if (!userId || !groupId) {
             return res.status(400).json({
@@ -197,7 +196,7 @@ export async function accept_join_request(req,res){
     try {
         const groupId = req.body.groupId;
         const requesterId = req.body.requesterId;
-        const adminId = req.user.userId;
+        const adminId = req.user.userID;
         if (!groupId || !requesterId || !adminId) {
             return res.status(400).json({
                 error: "groupId, requesterId, and adminId are required",
@@ -256,7 +255,7 @@ export async function accept_join_request(req,res){
 export async function get_join_requests_for_my_group(req,res){
     try{
         const groupId = req.body.groupId;
-        const userId = req.user.userId;
+        const userId = req.user.userID;
         if (!groupId || !userId) {
             return res.status(400).json({
                 error: "groupId and userId are required",
@@ -311,14 +310,14 @@ export async function get_groups_by_id_then_semantically(req, res) {
             });
         }
         // first try to find by id if not then we will find by name using similarity search using regex in mongodb ...
-        const group = await GroupChat.findById(query);
-        if (group) {
-            return res.status(200).json({
-                result: group,
-                status: "ok",
-                error: null
-            });
-        }
+        // const group = await GroupChat.findById(query);
+        // if (group) {
+        //     return res.status(200).json({
+        //         result: group,
+        //         status: "ok",
+        //         error: null
+        //     });
+        // }
         const groups = await GroupChat.find({
             group_name: { $regex: query, $options: "i" } // case-insensitive
         });
@@ -343,7 +342,17 @@ export async function get_groups_by_id_then_semantically(req, res) {
 
 export async function create_groupChat(req,res){
     try{
-        const userId = req.user.userId;
+        // return {
+        //     error : null,
+        //     status : "ok",
+        //     result : null
+        // }
+        const userId = req.user.userID;
+        const name= req.body.group_name;
+        const subject = req.body.subject;
+        const description = req.body.description;
+        //  subject: newGroup.subject,
+        //    description: newGroup.description,
         if(!userId){
             return res.status(403).json({
                 error : "no user found",
@@ -357,9 +366,18 @@ export async function create_groupChat(req,res){
         newGroup.group_admins.push(userId);
         newGroup.group_members.push(userId);
         newGroup.messages = [];
+        newGroup.group_name = name;
+        if (subject != null) {
+      newGroup.group_subject = subject;
+    }
+
+    if (description != null) {
+      newGroup.gr = description;
+    }
         await newGroup.save();
         return res.status(201).json({
             error: null,
+            name,
             status: "success",
             result: newGroup
         });
@@ -373,7 +391,7 @@ export async function create_groupChat(req,res){
 
 export async function  delete_groupChat(req,res) {
     try {
-        const userId = req.user.userId;
+        const userId = req.user.userID;
         const groupChatId = req.body.groupChatId;
         const group = await GroupChat.findById(groupChatId);
         if(!group){
