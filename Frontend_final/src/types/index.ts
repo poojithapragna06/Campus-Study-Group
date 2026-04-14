@@ -103,3 +103,10 @@ export type ActiveView =
   | 'admin'
   | 'friends';   // ← add this
 // export type ActiveView = 'dashboard' | 'groups' | 'chat' | 'sessions' | 'files' | 'admin';
+type RealGroup = {
+  _id: string;
+  group_name: string;
+  group_members: string[];
+  group_admins: string[];
+  requires_permission: boolean;
+};

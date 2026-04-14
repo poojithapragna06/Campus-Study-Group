@@ -3,6 +3,7 @@ import * as api from '../api';
 import { StudyGroup, StudySession, Message, SharedFile } from '../types';
 import * as friendsApi from '../api/Friends';
 import * as groupsApi from '../api/groups';
+import { apiCreateGroup, apiDeleteGroup } from '../api/groups';
 // ─── Query Keys (typed constants) ─────────────────────────────────────────────
 export const QK = {
   groups: ['groups'] as const,
@@ -306,4 +307,41 @@ export function useSearchGroups(query: string) {
     queryFn: () => groupsApi.apiSearchGroups(query),
     enabled: query.length >= 2,
   });
+}// ─── ADD THESE to src/hooks/useQueries.ts ────────────────────────────────────
+// Add these imports at the top alongside your existing group imports:
+// import { apiCreateGroup, apiDeleteGroup } from '../api/groups';
+
+// Add these keys to QK:
+// createGroup is a mutation so no query key needed
+// deleteGroup is a mutation so no query key needed
+
+// ─── New hooks to append at the bottom of useQueries.ts ──────────────────────
+
+export function useCreateRealGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { group_name: string; requires_permission: boolean }) =>
+      apiCreateGroup(payload),
+    onSuccess: () => {
+      // Invalidate both my groups and admin groups caches
+      qc.invalidateQueries({ queryKey: QK.myGroups });
+      qc.invalidateQueries({ queryKey: QK.adminGroups });
+    },
+  });
 }
+
+
+export function useDeleteRealGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (groupChatId: string) => apiDeleteGroup(groupChatId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.myGroups });
+      qc.invalidateQueries({ queryKey: QK.adminGroups });
+    },
+  });
+}
+
+// useJoinGroup already exists — update the body field name:
+// OLD: body: JSON.stringify({ group_chat_id: groupChatId })
+// NEW: body: JSON.stringify({ groupChatId })           ← controller reads req.body.groupChatId

@@ -12,9 +12,16 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ActiveView, StudyGroup } from './types';
-import { currentUser, adminUser, studyGroups } from './data/mockData';
+import { currentUser, adminUser } from './data/mockData';
 import Friends from './components/Friends';
-
+import { RealGroupChat } from './types';
+type RealGroup = {
+  _id: string;
+  group_name: string;
+  group_members: string[];
+  group_admins: string[];
+  requires_permission: boolean;
+}; 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -33,7 +40,8 @@ type AuthPage = 'login' | 'signup';
 function AuthenticatedApp() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [user, setUser] = useState(currentUser);
-  const [selectedGroup, setSelectedGroup] = useState<StudyGroup>(studyGroups[0]);
+  // const [selectedGroup, setSelectedGroup] = useState<StudyGroup>(studyGroups[0]);
+  const [selectedGroup, setSelectedGroup] = useState<RealGroup | null>(null);
   const { logout } = useAuth();
 
   const toggleRole = () => {
@@ -51,7 +59,7 @@ function AuthenticatedApp() {
       case 'groups':    return <StudyGroups setActiveView={setActiveView} setSelectedGroup={setSelectedGroup} />;
       case 'chat':      return <Chat selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} />;
       case 'sessions':  return <Sessions />;
-      case 'files':     return <SharedFiles />;
+      // case 'files':     return <SharedFiles />;
       case 'admin':     return user.role === 'admin' ? <AdminPanel /> : <Dashboard setActiveView={setActiveView} />;
       case 'friends':   return <Friends />;
       default:          return <Dashboard setActiveView={setActiveView} />;
