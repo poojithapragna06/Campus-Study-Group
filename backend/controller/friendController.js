@@ -158,6 +158,29 @@ export async function getFriendRequests(req,res) {
     }
 }
 
+export async function getSentFriendRequests(req, res) {
+    try {
+        const userId = req.user.userID;
+        const sentRequests = await sql`
+        SELECT u.userID as recieverId, u.username as username, fr.created_at
+        FROM users u 
+        JOIN friend_requests fr ON u.userID = fr.recieverId
+        WHERE fr.senderId = ${userId}
+        `;
+
+        return res.status(200).json({
+            status: 'success',
+            sentRequests: sentRequests
+        });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+        });
+    }
+}
+
 export async function getSuggestions(req,res) {
     try {
         const suggestions = await sql`

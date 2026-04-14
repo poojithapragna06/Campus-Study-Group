@@ -1,16 +1,19 @@
 import http from "http"
 import express from "express"
-import jwt from "jsonwebtoken";
+import jwtLib from "jsonwebtoken";
 import { Server } from "socket.io"
 //  we will use a bit of in memory store aswell... no problem
 import Redis from "ioredis";
-import { GroupChat } from "./models/groupChat";
-import jwt from "jsonwebtoken";
-import { sql } from "./dbUtils/sql_utl/sql_connector";
+import { GroupChat } from "./models/groupChat.js";
+import { sql } from "./dbUtils/sql_utl/sql_connector.js";
+import { connectToDatabase } from './dbUtils/mongoConnect.js';
+
+await connectToDatabase();
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] }
+    cors: { origin: "http://localhost:3000", methods: ["GET", "POST"] }
 });
 
 const redis = new Redis(
@@ -19,6 +22,14 @@ const redis = new Redis(
         port: 6379
     }
 );
+
+redis.on("error", (err) => {
+    console.error("Redis connection error:", err.message);
+});
+
+redis.on("connect", () => {
+    console.log("Connected to Redis successfully");
+});
 
 async function pushToredis(groupChatId, message) {
     await redis.rpush(groupChatId, JSON.stringify(message));
@@ -76,7 +87,7 @@ io.on("connection", async (socket) => {
 
     socket.on("delete-post", async ({ groupChatId, jwt: token, postId }) => {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'MOKSHU_SECRET');
+            const decoded = jwtLib.verify(token, process.env.JWT_SECRET || 'MOKSHU_SECRET');
             const userId = decoded.Uid;
 
             const users = await sql`SELECT * FROM users WHERE userID = ${userId}`;
@@ -131,5 +142,5 @@ io.on("connection", async (socket) => {
 })
 
 server.listen(5002, () => {
-    console.log("chat server up and running on port : 5002");
+    console.log("Chat server up and running on port : 5002");
 })

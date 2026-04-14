@@ -2,3 +2,4 @@ chat.tsx are not using all routes make them such that is uses all routes properl
 excpet admin related functionality . and if it private then it should send request but all are directly joining with request. and delete the group if the user is admin and group is private .
 give file this is current chat.tsx .
 like 
+chatserver.js file is also there integrate it properly

@@ -46,21 +46,43 @@ const SharedFiles: React.FC = () => {
     return matchSearch && matchGroup;
   });
 
-  const handleDrop = (e: React.DragEvent) => {
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
-    droppedFiles.forEach(f => {
-      uploadFile.mutate({
-        groupId: 'g1',
-        name: f.name,
-        size: f.size > 1024 * 1024 ? (f.size / 1024 / 1024).toFixed(1) + ' MB' : (f.size / 1024).toFixed(0) + ' KB',
-        type: inferType(f.name),
-        uploadedBy: 'Aryan Sharma',
-        uploadedAt: new Date().toISOString().split('T')[0],
-        url: '#',
-      });
-    });
+    
+    setIsUploadingFiles(true);
+    for (const f of droppedFiles) {
+      try {
+        const formData = new FormData();
+        formData.append('file', f);
+        
+        const token = localStorage.getItem('token');
+        const uploadRes = await fetch('http://localhost:5000/api/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        const uploadData = await uploadRes.json();
+        
+        uploadFile.mutate({
+          groupId: 'g1',
+          name: f.name,
+          size: f.size > 1024 * 1024 ? (f.size / 1024 / 1024).toFixed(1) + ' MB' : (f.size / 1024).toFixed(0) + ' KB',
+          type: inferType(f.name),
+          uploadedBy: 'You',
+          uploadedAt: new Date().toISOString().split('T')[0],
+          url: uploadData.url, // Store actual Cloudinary URL
+        });
+      } catch (e) {
+        console.error('File upload failed', e);
+      }
+    }
+    setIsUploadingFiles(false);
   };
 
   const handleDelete = (id: string) => {
@@ -84,7 +106,7 @@ const SharedFiles: React.FC = () => {
       <div onDrop={handleDrop} onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
         className="border-2 border-dashed rounded-2xl p-8 text-center mb-6 transition-all duration-200 cursor-pointer"
         style={{ borderColor: dragOver ? '#FFB800' : '#2A3A50', background: dragOver ? 'rgba(255,184,0,0.05)' : 'transparent' }}>
-        {uploadFile.isPending ? (
+        {uploadFile.isPending || isUploadingFiles ? (
           <div className="flex flex-col items-center gap-2">
             <Upload size={28} className="animate-bounce mx-auto" style={{ color: '#FFB800' }} />
             <p className="text-sm font-medium" style={{ color: '#FFB800' }}>Uploading…</p>

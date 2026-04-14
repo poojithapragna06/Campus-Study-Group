@@ -9,6 +9,7 @@ const groupChatSchema = new mongoose.Schema({
     group_description : {type:String,required:false},
     group_subject : {type:String,required:false},
     group_name : {type:String,required:false},
+    requires_permission : {type:Boolean, default: false},
     messages: [
             {
                 message_id : {type:String,required:false},

@@ -1,13 +1,22 @@
-import  { useState, useRef, useEffect } from 'react';
+import  { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Paperclip, Search, Users, Lock, BookOpen,
-  RefreshCw, LogOut, ShieldCheck, Trash2, Plus, X,
+  RefreshCw, LogOut, ShieldCheck, Trash2, Plus, X, UserPlus,
 } from 'lucide-react';
-import { currentUser } from '../data/mockData';
-import { useMyRealGroups, useRealGroupChat } from '../hooks/useQueries';
+import { useMyRealGroups, useRealGroupChat, useJoinRequests, useAcceptJoinRequest } from '../hooks/useQueries';
 import { useCreateRealGroup, useDeleteRealGroup } from '../hooks/useQueries';
 import { Skeleton } from './ui';
 import { format } from 'date-fns';
+
+// Get current user ID from JWT token
+function getCurrentUserId(): string {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return '';
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return String(payload.Uid);
+  } catch { return ''; }
+}
 
 // ─── Types matching MongoDB GroupChat model ───────────────────────────────────
 interface RealGroup {
@@ -62,7 +71,12 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newGroupName, setNewGroupName]     = useState('');
   const [newGroupPrivate, setNewGroupPrivate] = useState(false);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const currentUserId = getCurrentUserId();
 
   const { data: groupsRes, refetch: refetchGroups } = useMyRealGroups();
   const allGroups: RealGroup[] = groupsRes?.result ?? [];
@@ -74,7 +88,7 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
   const activeGroup: RealGroup | null = selectedGroup ?? allGroups[0] ?? null;
   const activeIndex  = allGroups.findIndex(g => g._id === activeGroup?._id);
   const activeColor  = getColor(activeIndex >= 0 ? activeIndex : 0);
-  const isAdmin      = activeGroup?.group_admins?.includes(currentUser.id) ?? false;
+  const isAdmin      = activeGroup?.group_admins?.includes(currentUserId) ?? false;
 
   // GET /api/groups/chat { group_id } → { result: Message[], status: 'ok' }
   const {
@@ -83,10 +97,14 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
     isFetching,
     refetch: refetchChat,
   } = useRealGroupChat(activeGroup?._id ?? '');
-  const msgs: RealMessage[] = chatRes?.result ?? [];
+  const msgs: RealMessage[] = useMemo(() => chatRes?.result ?? [], [chatRes]);
 
   const createGroup = useCreateRealGroup();
   const deleteGroup = useDeleteRealGroup();
+  const acceptJoinReq = useAcceptJoinRequest();
+
+  const reqQuery = useJoinRequests(isAdmin ? activeGroup._id : '');
+  const joinRequests = reqQuery.data?.result ?? [];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,9 +122,10 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
     if (!input.trim() || !activeGroup || sending) return;
     setSending(true);
     try {
-      const res = await fetch('/api/groups/message', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/groups/message', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ group_id: activeGroup._id, content: input.trim() }),
       });
       if (!res.ok) {
@@ -120,6 +139,54 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
       showToast('Failed to send.', 'error');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeGroup) return;
+    
+    setIsUploading(true);
+    showToast(`Uploading ${file.name}…`, 'info');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const token = localStorage.getItem('token');
+      // 1. Upload to universal upload endpoint
+      const uploadRes = await fetch('http://localhost:5000/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }, // No Content-Type so browser sets boundary
+        body: formData,
+      });
+      
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      const uploadData = await uploadRes.json();
+      
+      const fileUrl = uploadData.url;
+      const fileName = uploadData.fileName;
+
+      // 2. Post as a file message
+      const msgRes = await fetch('http://localhost:5000/api/groups/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ 
+          group_id: activeGroup._id, 
+          content: `[FILE] ${fileName}`,
+          fetchables: [fileUrl]
+        }),
+      });
+      
+      if (!msgRes.ok) throw new Error('Failed to send file message');
+      
+      showToast('File uploaded automatically', 'success');
+      refetchChat();
+    } catch {
+      showToast('Failed to upload file.', 'error');
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -165,14 +232,18 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
     });
   };
 
-  // ── Leave group — no backend endpoint yet, placeholder ───────────────────
+  // ── Leave group ────────────────────────────────────────────────────────
   const handleLeaveGroup = async () => {
     if (!activeGroup) return;
     try {
-      const res = await fetch('/api/groups/leave', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/groups/leave', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: activeGroup._id }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ groupChatId: activeGroup._id }),
       });
       if (!res.ok) throw new Error();
       showToast(`Left "${activeGroup.group_name}".`, 'info');
@@ -299,6 +370,20 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
                   ))}
                 </div>
 
+                {/* Admin Requests button */}
+                {isAdmin && activeGroup.requires_permission && (
+                  <button onClick={() => setShowRequestsModal(true)} title="Join Requests"
+                    className="p-2 rounded-xl flex items-center gap-1 hover:opacity-75 relative transition-opacity"
+                    style={{ background: 'rgba(0,212,170,0.08)', color: '#00D4AA' }}>
+                    <UserPlus size={14} />
+                    {joinRequests.length > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-black" style={{ background: '#00D4AA' }}>
+                        {joinRequests.length}
+                      </span>
+                    )}
+                  </button>
+                )}
+
                 {/* Leave (non-admins) */}
                 {!isAdmin && (
                   <button onClick={handleLeaveGroup} title="Leave group"
@@ -340,7 +425,7 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
                   <p className="text-sm" style={{ color: '#4A5A70' }}>No messages yet. Say hi!</p>
                 </div>
               ) : msgs.map((msg, i) => {
-                const isMine      = msg.senderId === currentUser.id;
+                const isMine      = String(msg.senderId) === currentUserId || String((msg as any).sender_id) === currentUserId;
                 const prevMsg     = msgs[i - 1];
                 const showHeader  = !prevMsg || prevMsg.senderId !== msg.senderId;
                 // senderName may not be stored — fallback to last 4 chars of senderId
@@ -366,18 +451,45 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
                           {time && <span className="text-xs" style={{ color: '#4A5A70' }}>{time}</span>}
                         </div>
                       )}
-                      {msg.type === 'file' ? (
-                        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-                          style={{ background: isMine ? 'rgba(255,184,0,0.15)' : '#1E2A3A', border: `1px solid ${isMine ? '#FFB80040' : '#2A3A50'}` }}>
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#FFB80020' }}>
-                            <Paperclip size={14} style={{ color: '#FFB800' }} />
+                      {msg.content.startsWith('[FILE] ') || msg.type === 'file' ? (() => {
+                        const fileUrl = (msg as any).fetchables?.[0] ?? '#';
+                        const fileName = msg.content.replace('[FILE] ', '') || msg.fileName || 'File';
+                        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                        
+                        return (
+                          <div className="flex flex-col gap-2 p-3 rounded-2xl" style={{ background: isMine ? 'rgba(255,184,0,0.15)' : '#1E2A3A', border: `1px solid ${isMine ? '#FFB80040' : '#2A3A50'}` }}>
+                            {isImage && fileUrl !== '#' && (
+                              <img src={fileUrl} alt={fileName} className="max-w-full h-auto rounded-xl object-contain max-h-48" />
+                            )}
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#FFB80020' }}>
+                                <Paperclip size={14} style={{ color: '#FFB800' }} />
+                              </div>
+                              <div className="text-xs font-medium text-white break-all">{fileName}</div>
+                            </div>
+                            <a 
+                              href={fileUrl} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              download={fileName}
+                              className="mt-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-opacity hover:opacity-80"
+                              style={{ background: isMine ? '#FFB800' : '#2A3A50', color: isMine ? '#0D0D0D' : '#FFF', textDecoration: 'none' }}
+                            >
+                              Download / Open
+                            </a>
                           </div>
-                          <div className="text-xs font-medium text-white">{msg.fileName}</div>
-                        </div>
-                      ) : (
+                        );
+                      })() : (
                         <div className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
                           style={{ background: isMine ? '#FFB800' : '#1E2A3A', color: isMine ? '#0D0D0D' : '#E8EDF4' }}>
                           {msg.content}
+                          {(msg as any).fetchables?.length > 0 && !msg.content.startsWith('[FILE]') && (
+                             <div className="mt-2 space-y-1">
+                               {(msg as any).fetchables.map((url: string, idx: number) => (
+                                 <a key={idx} href={url} target="_blank" rel="noreferrer" className="block text-xs underline opacity-80" style={{ color: isMine ? '#000' : '#FFB800' }}>Attached Link {idx+1}</a>
+                               ))}
+                             </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -390,9 +502,17 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
             {/* Input */}
             <div className="px-6 py-4 flex-shrink-0" style={{ background: '#1A1F2E', borderTop: '1px solid #1E2A3A' }}>
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: '#111827', border: '1px solid #2A3A50' }}>
-                <button className="flex-shrink-0" style={{ color: '#4A5A70' }}><Paperclip size={17} /></button>
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex-shrink-0 hover:opacity-70 transition-opacity" style={{ color: isUploading ? '#6B7A8D' : '#4A5A70' }}
+                >
+                  <Paperclip size={17} />
+                </button>
                 <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
-                placeholder={`Message #${activeGroup?.group_name?.toLowerCase().replace(/ /g, '-') || 'general'}…`}
+                disabled={isUploading}
+                placeholder={isUploading ? 'Uploading file…' : `Message #${activeGroup?.group_name?.toLowerCase().replace(/ /g, '-') || 'general'}…`}
                   className="flex-1 bg-transparent text-sm outline-none" style={{ color: '#E8EDF4' }} />
                 <button onClick={handleSend} disabled={!input.trim() || sending}
                   className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 flex-shrink-0"
@@ -446,6 +566,59 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
                 style={{ background: '#FFB800', color: '#0D0D0D', opacity: !newGroupName.trim() || createGroup.isPending ? 0.5 : 1 }}>
                 {createGroup.isPending ? 'Creating…' : 'Create'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Join Requests Modal ── */}
+      {showRequestsModal && activeGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: '#111827', border: '1px solid #1E2A3A', maxHeight: '80vh' }}>
+            <div className="flex items-center justify-between p-4" style={{ background: '#1A1F2E', borderBottom: '1px solid #1E2A3A' }}>
+              <h3 className="font-display font-bold text-white flex items-center gap-2">
+                <UserPlus size={16} style={{ color: '#00D4AA' }} />
+                Join Requests
+              </h3>
+              <button onClick={() => setShowRequestsModal(false)}
+                className="p-1 rounded-lg hover:opacity-70 transition-opacity" style={{ color: '#6B7A8D', background: '#1E2A3A' }}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="p-4 flex-1 overflow-y-auto space-y-2">
+              {reqQuery.isLoading ? (
+                <p className="text-center text-xs" style={{ color: '#4A5A70' }}>Loading requests...</p>
+              ) : joinRequests.length === 0 ? (
+                <p className="text-center text-xs" style={{ color: '#4A5A70' }}>No pending join requests.</p>
+              ) : (
+                joinRequests.map((req: any) => (
+                  <div key={req._id} className="flex items-center justify-between p-3 rounded-xl"
+                    style={{ background: '#1A1F2E', border: '1px solid #2A3A50' }}>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-white truncate">
+                        {req.username} <span className="text-xs font-normal" style={{ color: '#4A5A70' }}>({req.requester_id})</span>
+                      </div>
+                      <div className="text-[10px]" style={{ color: '#6B7A8D' }}>Wants to join the group</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        acceptJoinReq.mutate({ groupId: activeGroup._id, requesterId: req.requester_id }, {
+                          onSuccess: () => {
+                            showToast(`Accepted ${req.username}`, 'success');
+                            refetchGroups();
+                          },
+                          onError: () => showToast('Failed to accept request', 'error')
+                        });
+                      }}
+                      disabled={acceptJoinReq.isPending}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity"
+                      style={{ background: '#00D4AA', color: '#0D0D0D', opacity: acceptJoinReq.isPending ? 0.5 : 1 }}>
+                      Accept
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

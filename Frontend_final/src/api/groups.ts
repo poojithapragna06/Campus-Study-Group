@@ -21,6 +21,16 @@ export async function apiFetchAdminGroups() {
   return res.json();
 }
 
+// GET http://localhost:5000/api/groups/all → { status: 'ok', result: GroupChat[] }
+export async function apiFetchAllGroups() {
+  const res = await fetch('http://localhost:5000/api/groups/all',{
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' , Authorization: `Bearer ${localStorage.getItem("token")}`,},
+  });
+  if (!res.ok) throw new Error('Failed to fetch all groups');
+  return res.json();
+}
+
 // POST http://localhost:5000/api/groups/chat { group_id } → { status: 'ok', result: Message[] }
 export async function apiFetchGroupChat(groupId: string) {
   const res = await fetch('http://localhost:5000/api/groups/chat', {
