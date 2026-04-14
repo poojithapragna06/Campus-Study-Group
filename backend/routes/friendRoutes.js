@@ -1,6 +1,6 @@
 import express from 'express';
 import { identify } from '../middleware/identify.js';
-import { acceptFriendRequest, getFriendRequests, getFriendsList, getMutualFriends, getSuggestions, getUsersbyUsername, rejectFriendRequest, sendFriendRequest } from '../controller/friendController.js';
+import { acceptFriendRequest, getFriendRequests, getFriendsList, getMutualFriends, getSuggestions, getUsersbyUsername, rejectFriendRequest, sendFriendRequest, unfriend } from '../controller/friendController.js';
 
 const router = express.Router();
 
@@ -21,5 +21,5 @@ router.post('/rejectrequest',rejectFriendRequest);
 router.get('/getMutualfriends',getMutualFriends);
 
 router.get('/search',getUsersbyUsername);
-
+router.post('/unfriend',unfriend);
 export default router;

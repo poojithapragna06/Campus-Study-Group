@@ -83,8 +83,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
             <ErrorState message="Failed to load groups." onRetry={() => groupsQuery.refetch()} />
           ) : (
             <div className="space-y-3">
-              {myGroups.map(group => (
-                <div key={group.id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
+              {myGroups.map((group:any) => (
+                <div key={group._id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
                   style={{ background: '#111827' }} onClick={() => setActiveView('groups')}>
                   <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: group.coverColor + '30', border: `1.5px solid ${group.coverColor}50` }}>
                     <div className="w-2.5 h-2.5 rounded-sm" style={{ background: group.coverColor }} />

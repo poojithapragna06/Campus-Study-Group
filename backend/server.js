@@ -5,7 +5,14 @@ import authRoutes from './routes/authRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
 const app = express();
 import { connectToDatabase } from './dbUtils/mongoConnect.js';
-app.use(cors());
+ const corsOptions = {
+     origin: "http://localhost:3000",
+     credentials: true
+ }
+ 
+ import cookieParser from "cookie-parser";
+app.use(cookieParser());
+app.use(cors(corsOptions));
 app.use(express.json());
 await connectToDatabase();
 

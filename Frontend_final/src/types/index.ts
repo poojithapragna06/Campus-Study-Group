@@ -64,5 +64,42 @@ export interface SharedFile {
   uploadedAt: string;
   url: string;
 }
+export interface Friend {
+  username: string;
+}
 
-export type ActiveView = 'dashboard' | 'groups' | 'chat' | 'sessions' | 'files' | 'admin';
+export interface FriendRequest {
+  senderId: string;
+  username: string;
+}
+
+export interface UserSearchResult {
+  userID: string;
+  username: string;
+}
+
+export interface RealGroupChat {
+  _id: string;
+  group_name: string;
+  group_members: string[];
+  group_admins: string[];
+  requires_permission: boolean;
+  messages: GroupMessage[];
+}
+
+export interface GroupMessage {
+  senderId: string;
+  content: string;
+  timestamp: string;
+}
+
+// Add 'friends' to your existing ActiveView union:
+export type ActiveView =
+  | 'dashboard'
+  | 'groups'
+  | 'chat'
+  | 'sessions'
+  | 'files'
+  | 'admin'
+  | 'friends';   // ← add this
+// export type ActiveView = 'dashboard' | 'groups' | 'chat' | 'sessions' | 'files' | 'admin';

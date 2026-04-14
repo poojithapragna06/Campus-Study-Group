@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Search, Users, Lock, BookOpen, RefreshCw } from 'lucide-react';
 import { currentUser } from '../data/mockData';
 import { StudyGroup } from '../types';
-import { useGroups, useMessages, useSendMessage } from '../hooks/useQueries';
+// import { useGroups, useMessages, useSendMessage } from '../hooks/useQueries';
+import { useMyRealGroups, useRealGroupChat, useSendMessage } from '../hooks/useQueries';
+import StudyGroups from './StudyGroups';
 import { Skeleton } from './ui';
 import { format } from 'date-fns';
 
@@ -15,12 +17,16 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const { data: groups = [] } = useGroups();
-  const myGroups = groups.filter(g => g.members.some(m => m.id === currentUser.id));
+const { data: groupsRes } = useMyRealGroups();
+const groups = groupsRes?.result ?? [];
+  const myGroups = groups.filter((g:any) => g.members.some((m:any) => m.id === currentUser.id));
 
   const activeGroup: StudyGroup | null = selectedGroup ?? myGroups[0] ?? null;
 
-  const { data: msgs = [], isLoading: msgsLoading, isFetching } = useMessages(activeGroup?.id ?? '');
+ const { data: chatRes, isLoading: msgsLoading, isFetching } = useRealGroupChat(activeGroup?.id ?? '');
+const msgs = chatRes?.result ?? [];
+
+  
   const sendMessage = useSendMessage();
 
   useEffect(() => {
@@ -61,10 +67,10 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
           <span className="text-xs font-medium uppercase tracking-widest px-2" style={{ color: '#4A5A70' }}>My Groups</span>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-hide px-3 space-y-1">
-          {myGroups.map(group => {
-            const isActive = activeGroup?.id === group.id;
+          {myGroups.map((group:any) => {
+            const isActive = activeGroup?.id === group._id;
             return (
-              <button key={group.id} onClick={() => setSelectedGroup(group)}
+              <button key={group._id} onClick={() => setSelectedGroup(group)}
                 className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-200"
                 style={{ background: isActive ? 'rgba(255,184,0,0.08)' : 'transparent', borderLeft: isActive ? `2px solid ${group.coverColor}` : '2px solid transparent' }}>
                 <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: group.coverColor + '20' }}>
@@ -131,7 +137,7 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
                   </div>
                 ))}
               </div>
-            ) : msgs.map((msg, i) => {
+            ) : msgs.map((msg: any, i: number) => {
               const isMine = msg.senderId === currentUser.id;
               const prevMsg = msgs[i - 1];
               const showHeader = !prevMsg || prevMsg.senderId !== msg.senderId;

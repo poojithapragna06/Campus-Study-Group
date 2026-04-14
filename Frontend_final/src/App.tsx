@@ -13,6 +13,7 @@ import SignupPage from './pages/SignupPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ActiveView, StudyGroup } from './types';
 import { currentUser, adminUser, studyGroups } from './data/mockData';
+import Friends from './components/Friends';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,7 @@ function AuthenticatedApp() {
       case 'sessions':  return <Sessions />;
       case 'files':     return <SharedFiles />;
       case 'admin':     return user.role === 'admin' ? <AdminPanel /> : <Dashboard setActiveView={setActiveView} />;
+      case 'friends':   return <Friends />;
       default:          return <Dashboard setActiveView={setActiveView} />;
     }
   };
