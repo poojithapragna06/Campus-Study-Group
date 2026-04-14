@@ -58,6 +58,7 @@ export async function registerHandler(req, res) {
         const result = await sql`INSERT INTO users (email,username,password,created_at) VALUES (${email},${username},${hashedPassword},NOW())`;
         userId = result.insertId;
         token = jwt.sign({ Uid: userId }, process.env.JWT_SECRET || 'MOKSHU_SECRET', { expiresIn: '1h' });
+         res.cookie("token", token, {httpOnly:true, secure:false,sameSite:"none", maxAge:24*60*60*1000});
         return res.status(201).json({
             status: 'success',
             message: 'user registered successfully',

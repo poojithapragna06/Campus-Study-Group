@@ -39,6 +39,7 @@ export async function sendFriendRequest(req, res) {
     catch (e) {
         console.error(e);
         return res.status(500).json({
+            val:req.user.userID,
             status: 'error',
             message: 'Internal server error'
         });
@@ -74,7 +75,8 @@ export async function acceptFriendRequest(req, res) {
 
 export async function rejectFriendRequest(req, res) {
     try {
-        const {senderId,recieverId} = req.body;
+         const senderId = req.body.senderId;
+        const recieverId = req.user.userID;
         const existingRequeest = await sql`SELECT * FROM friend_requests WHERE senderId = ${senderId} AND recieverId = ${recieverId}`;
         if(existingRequeest.length === 0) {
             return res.status(400).json({
@@ -101,6 +103,7 @@ export async function getFriendsList(req, res) {
     try {
         const userId = req.user.userID;
         const friends = await sql`SELECT * FROM friends WHERE user1 = ${userId} OR user2 = ${userId}`;
+      
         const friendIds = friends.map(friend => (friend.user1 === userId ? friend.user2 : friend.user1));
         if(friendIds.length === 0) {
             return res.status(200).json({
@@ -108,7 +111,16 @@ export async function getFriendsList(req, res) {
                 friends: []
             });
         }
-        const friendDetails = await sql`SELECT username FROM users WHERE userID IN (${friendIds})`;
+      
+
+const friendDetails = await sql`
+  SELECT u.userID, u.username
+  FROM users u
+  JOIN friends f 
+    ON (f.user1 = u.userID OR f.user2 = u.userID)
+  WHERE (${userId} = f.user1 OR ${userId} = f.user2)
+    AND u.userID != ${userId}
+`;
         return res.status(200).json({
             status: 'success',
             friends: friendDetails
@@ -171,12 +183,18 @@ export async function getSuggestions(req,res) {
 
 export async function unfriend(req,res) {
     try {
-        const {userId1,userId2} = req.body;
+        // const {userId1,userId2} = req.body;
+        const userId1 = req.user.userID;
+        const username= req.body.username;
+        const userId2 = (await sql`SELECT userID FROM users WHERE username = ${username}`)[0].userID;
         const existingFriendship = await sql`SELECT * FROM friends where (user1=${userId1} and user2 = ${userId2}) or (user1 = ${userId2} and user2 = ${userId1})`;
         if(existingFriendship.length === 0) {
             return res.status(400).json({
                 status: 'error',
-                message: 'You are not friends'
+                message: 'You are not friends',
+                existingFriendship,
+                userId1,
+                userId2,
             });
         }
         await sql`DELETE FROM friends where (user1=${userId1} and user2 = ${userId2}) or (user1 = ${userId2} and user2 = ${userId1})`;

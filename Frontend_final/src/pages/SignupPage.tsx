@@ -48,22 +48,22 @@ const register_url="http://localhost:5000/api/auth/register";
         }),
       });
 
+      const user = await res.json();
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        // const data = await res.json().catch(() => ({}));
         // If backend returns a field name, pin the error to that field
-        if (data?.field && data?.message) {
-          setError(data.field as keyof SignupFormValues, {
+        if (user?.field && user?.message) {
+          setError(user.field as keyof SignupFormValues, {
             type: 'server',
-            message: data.message,
+            message: user.message,
           });
           return;
         }
-        throw new Error(data?.message || 'Could not create account. Please try again.');
+        throw new Error(user?.message || 'Could not create account. Please try again.');
       }
 
-      const user = await res.json();
       // ────────────────────────────────────────────────────────────────────
-
+        localStorage.setItem("token", user.jwt);
       login(user);
     } catch (err) {
       setServerError(

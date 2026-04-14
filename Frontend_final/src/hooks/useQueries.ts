@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../api';
 import { StudyGroup, StudySession, Message, SharedFile } from '../types';
-
+import * as friendsApi from '../api/Friends';
+import * as groupsApi from '../api/groups';
 // ─── Query Keys (typed constants) ─────────────────────────────────────────────
 export const QK = {
   groups: ['groups'] as const,
@@ -11,6 +12,14 @@ export const QK = {
   files: ['files'] as const,
   users: ['users'] as const,
   stats: (userId: string) => ['stats', userId] as const,
+  friends:        ['friends'] as const,
+friendRequests: ['friendRequests'] as const,
+userSearch:     (q: string) => ['userSearch', q] as const,
+myGroups:       ['myGroups'] as const,
+adminGroups:    ['adminGroups'] as const,
+realGroupChat:  (id: string) => ['realGroupChat', id] as const,
+joinRequests:   (groupId: string) => ['joinRequests', groupId] as const,
+groupSearch:    (q: string) => ['groupSearch', q] as const,
 };
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
@@ -183,5 +192,118 @@ export function useDashboardStats(userId: string) {
     queryKey: QK.stats(userId),
     queryFn: () => api.fetchDashboardStats(userId),
     staleTime: 1000 * 30,
+  });
+}
+// ─── Friends ──────────────────────────────────────────────────────────────────
+
+export function useFriends() {
+  return useQuery({
+    queryKey: QK.friends,
+    queryFn: friendsApi.apiFetchFriends,
+  });
+}
+
+export function useFriendRequests() {
+  return useQuery({
+    queryKey: QK.friendRequests,
+    queryFn: friendsApi.apiFetchFriendRequests,
+  });
+}
+
+export function useSearchUsers(username: string) {
+  return useQuery({
+    queryKey: QK.userSearch(username),
+    queryFn: () => friendsApi.apiSearchUsers(username),
+    enabled: username.length >= 2,
+    staleTime: 0,              // 🔥 important
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useSendFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (recieverId: string) => friendsApi.apiSendFriendRequest(recieverId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK.friends }),
+  });
+}
+
+export function useAcceptFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (senderId: string) => friendsApi.apiAcceptFriendRequest(senderId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.friendRequests });
+      qc.invalidateQueries({ queryKey: QK.friends });
+    },
+  });
+}
+
+export function useRejectFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ senderId, recieverId }: { senderId: string; recieverId: string }) =>
+      friendsApi.apiRejectFriendRequest(senderId, recieverId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK.friendRequests }),
+  });
+}
+
+// ─── Real Group Chat ──────────────────────────────────────────────────────────
+
+export function useMyRealGroups() {
+  return useQuery({
+    queryKey: QK.myGroups,
+    queryFn: groupsApi.apiFetchMyGroups,
+  });
+}
+
+export function useAdminGroups() {
+  return useQuery({
+    queryKey: QK.adminGroups,
+    queryFn: groupsApi.apiFetchAdminGroups,
+  });
+}
+
+export function useRealGroupChat(groupId: string) {
+  return useQuery({
+    queryKey: QK.realGroupChat(groupId),
+    queryFn: () => groupsApi.apiFetchGroupChat(groupId),
+    enabled: !!groupId,
+    refetchInterval: 5000,
+  });
+}
+
+export function useJoinGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (group_chat_id: string) => groupsApi.apiJoinGroup(group_chat_id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK.myGroups }),
+  });
+}
+
+export function useJoinRequests(groupId: string) {
+  return useQuery({
+    queryKey: QK.joinRequests(groupId),
+    queryFn: () => groupsApi.apiFetchJoinRequests(groupId),
+    enabled: !!groupId,
+  });
+}
+
+export function useAcceptJoinRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, requesterId }: { groupId: string; requesterId: string }) =>
+      groupsApi.apiAcceptJoinRequest(groupId, requesterId),
+    onSuccess: (_, { groupId }) =>
+      qc.invalidateQueries({ queryKey: QK.joinRequests(groupId) }),
+  });
+}
+
+export function useSearchGroups(query: string) {
+  return useQuery({
+    queryKey: QK.groupSearch(query),
+    queryFn: () => groupsApi.apiSearchGroups(query),
+    enabled: query.length >= 2,
   });
 }

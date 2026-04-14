@@ -31,14 +31,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignup }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
+        credentials: "include",
       });
 
+       const user = await res.json();
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || 'Invalid email or password.');
+        // const data = await res.json().catch(() => ({}));
+        throw new Error(user?.message || 'Invalid email or password.');
       }
+        localStorage.setItem("token", user.jwt);
 
-      const user = await res.json();
+     
       // ────────────────────────────────────────────────────────────────────
 
       login(user);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, MessageSquare, Calendar, FolderOpen, Shield, LogOut, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Calendar, FolderOpen, Shield, LogOut, BookOpen ,UserPlus} from 'lucide-react';
 import { ActiveView, User } from '../types';
 
 interface SidebarProps {
@@ -11,12 +11,20 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { id: 'dashboard' as ActiveView, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'groups' as ActiveView, label: 'Study Groups', icon: Users },
-  { id: 'chat' as ActiveView, label: 'Group Chat', icon: MessageSquare },
-  { id: 'sessions' as ActiveView, label: 'Sessions', icon: Calendar },
-  { id: 'files' as ActiveView, label: 'Shared Files', icon: FolderOpen },
+  { id: 'dashboard' as ActiveView, label: 'Dashboard',     icon: LayoutDashboard },
+  { id: 'groups'    as ActiveView, label: 'Study Groups',  icon: Users },
+  { id: 'friends'   as ActiveView, label: 'Friends',       icon: UserPlus },  // ← add
+  { id: 'chat'      as ActiveView, label: 'Group Chat',    icon: MessageSquare },
+  { id: 'sessions'  as ActiveView, label: 'Sessions',      icon: Calendar },
+  { id: 'files'     as ActiveView, label: 'Shared Files',  icon: FolderOpen },
 ];
+// const navItems = [
+//   { id: 'dashboard' as ActiveView, label: 'Dashboard', icon: LayoutDashboard },
+//   { id: 'groups' as ActiveView, label: 'Study Groups', icon: Users },
+//   { id: 'chat' as ActiveView, label: 'Group Chat', icon: MessageSquare },
+//   { id: 'sessions' as ActiveView, label: 'Sessions', icon: Calendar },
+//   { id: 'files' as ActiveView, label: 'Shared Files', icon: FolderOpen },
+// ];
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, currentUser, onRoleSwitch, onLogout }) => {
   return (
