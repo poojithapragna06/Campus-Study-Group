@@ -138,7 +138,7 @@ export async function uploadFileMessage(req, res) {
         } else {
             // Upload images/videos to Cloudinary as normal
             const result = await cloudinary.uploader.upload(req.file.path, {
-                resource_type: "auto",
+                resource_type: "raw",
                 folder: "campus_study_chat",
                 public_id: `${Date.now()}_${req.file.originalname.replace(/\.[^.]+$/, "")}`,
             });

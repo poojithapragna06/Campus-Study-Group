@@ -41,6 +41,35 @@ console.log(users.length)
     }
 }
 
+export async function getAllUsers(req, res) {
+    try {
+        const users = await sql`SELECT userID, username, email, created_at FROM users`;
+        return res.status(200).json({
+            status: 'success',
+            result: users
+        });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+
+export async function deleteUser(req, res) {
+    try {
+        const { id } = req.params;
+        if (!id) return res.status(400).json({ error: 'User ID is required' });
+
+        await sql`DELETE FROM users WHERE userID = ${id}`;
+        return res.status(200).json({
+            status: 'success',
+            message: 'User deleted successfully'
+        });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+
 export async function registerHandler(req, res) {
     try {
         const { email, username, password } = req.body;

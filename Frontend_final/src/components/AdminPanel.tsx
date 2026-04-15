@@ -4,7 +4,7 @@ import {
   AlertTriangle, Trash2, Ban, CheckCircle, TrendingUp, Activity, Eye,
 } from 'lucide-react';
 import { messages, sharedFiles } from '../data/mockData';
-import { useAdminGroups, useUsers, useDeleteUser } from '../hooks/useQueries';
+import { useAllGroups, useUsers, useDeleteUser, useDeleteRealGroup } from '../hooks/useQueries';
 import { LoadingSpinner, ErrorState } from './ui';
 
 type Tab = 'overview' | 'groups' | 'users' | 'content';
@@ -12,15 +12,13 @@ type Tab = 'overview' | 'groups' | 'users' | 'content';
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
-  const groupsQuery = useAdminGroups();
+  const groupsQuery = useAllGroups();
   const usersQuery  = useUsers();
   const deleteUser  = useDeleteUser();
+  const deleteGroup = useDeleteRealGroup();
 
-  // Backend returns { status, result: GroupChat[] }
-  // GroupChat fields: _id, group_name, group_members[], group_admins[], requires_permission
+  // Backend returns { status: 'ok', result: GroupChat[] }
   const groups: any[] = groupsQuery.data?.result ?? [];
-
-  // useUsers still hits mock — swap for real endpoint when available
   const users: any[] = usersQuery.data ?? [];
 
   const stats = [
@@ -156,7 +154,7 @@ const AdminPanel: React.FC = () => {
           </div>
 
           {/* Reports — static placeholder */}
-          <div className="rounded-2xl p-5" style={{ background: '#1A1F2E', border: '1px solid #1E2A3A' }}>
+          {/* <div className="rounded-2xl p-5" style={{ background: '#1A1F2E', border: '1px solid #1E2A3A' }}>
             <h3 className="font-display font-semibold text-white mb-4 flex items-center gap-2">
               <AlertTriangle size={15} style={{ color: '#F97316' }} /> Recent Reports
             </h3>
@@ -186,7 +184,7 @@ const AdminPanel: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
       )}
 
@@ -245,20 +243,24 @@ const AdminPanel: React.FC = () => {
                       {isPrivate ? 'Private' : 'Public'}
                     </span>
                   </div>
-                  {/* No delete/archive endpoints in your backend — show disabled placeholder */}
                   <div className="col-span-2 flex gap-2">
                     <button
                       disabled
-                      title="Not available"
+                      title="Ban not implemented"
                       className="p-1.5 rounded-lg opacity-30 cursor-not-allowed"
                       style={{ background: '#1E2A3A', color: '#FFB800' }}
                     >
                       <Ban size={12} />
                     </button>
                     <button
-                      disabled
-                      title="Not available"
-                      className="p-1.5 rounded-lg opacity-30 cursor-not-allowed"
+                      onClick={() => {
+                        if(window.confirm(`Delete group "${group.group_name}"?`)) {
+                          deleteGroup.mutate(group._id);
+                        }
+                      }}
+                      disabled={deleteGroup.isPending}
+                      title="Delete Group"
+                      className="p-1.5 rounded-lg transition-opacity hover:opacity-70"
                       style={{ background: '#1E2A3A', color: '#EF4444' }}
                     >
                       <Trash2 size={12} />
@@ -326,7 +328,11 @@ const AdminPanel: React.FC = () => {
                     <Ban size={12} />
                   </button>
                   <button
-                    onClick={() => deleteUser.mutate(user.id ?? user.userID)}
+                    onClick={() => {
+                      if(window.confirm(`Delete user "${user.name}"?`)) {
+                        deleteUser.mutate(user.id);
+                      }
+                    }}
                     disabled={deleteUser.isPending}
                     className="p-1.5 rounded-lg transition-opacity hover:opacity-70"
                     style={{ background: '#1E2A3A', color: '#EF4444' }}
@@ -341,7 +347,7 @@ const AdminPanel: React.FC = () => {
       )}
 
       {/* ── Content Review tab ────────────────────────────────────────────── */}
-      {activeTab === 'content' && (
+      {/* {activeTab === 'content' && (
         <div className="rounded-2xl p-5" style={{ background: '#1A1F2E', border: '1px solid #1E2A3A' }}>
           <h3 className="font-display font-semibold text-white mb-4">Flagged Messages</h3>
           <div className="space-y-3">
@@ -392,7 +398,7 @@ const AdminPanel: React.FC = () => {
             ))}
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };

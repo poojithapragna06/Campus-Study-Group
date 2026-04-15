@@ -8,7 +8,6 @@ import {
   sessions as _sessions,
   messages as _messages,
   sharedFiles as _files,
-  users as _users,
 } from '../data/mockData';
 import { StudyGroup, StudySession, Message, SharedFile, User } from '../types';
 
@@ -115,14 +114,27 @@ export async function uploadFile(payload: Omit<SharedFile, 'id'>): Promise<Share
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function fetchUsers(): Promise<User[]> {
-  await delay();
-  return [..._users];
+  const token = localStorage.getItem('token');
+  const res = await fetch('http://localhost:5000/api/auth/users', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error('Failed to fetch users');
+  const data = await res.json();
+  // Map SQL userID to frontend id field if needed, but User interface has id as optional
+  return data.result.map((u: any) => ({
+    ...u,
+    id: String(u.userID),
+    name: u.username
+  }));
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  await delay(300);
-  const idx = _users.findIndex(u => u.id === id);
-  if (idx !== -1) _users.splice(idx, 1);
+  const token = localStorage.getItem('token');
+  const res = await fetch(`http://localhost:5000/api/auth/users/${id}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error('Failed to delete user');
 }
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────

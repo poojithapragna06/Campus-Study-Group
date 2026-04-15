@@ -1,14 +1,14 @@
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  role: 'student' | 'admin';
-  department: string;
-  year: number;
-  joinedAt: string;
-  groupsJoined: number;
-  sessionsAttended: number;
+  id?: string;
+  name?: string;
+  email?: string;
+  avatar?: string;
+  role?: 'student' | 'admin';
+  department?: string;
+  year?: number;
+  joinedAt?: string;
+  groupsJoined?: number;
+  sessionsAttended?: number;
 }
 
 export interface StudyGroup {

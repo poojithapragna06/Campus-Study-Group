@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import {pool} from "./dbUtils/sql_utl/db.js"
 import express from 'express';
 import cors from 'cors';

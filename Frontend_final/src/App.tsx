@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import Sidebar from './components/Sidebar';
@@ -6,13 +6,11 @@ import Dashboard from './components/Dashboard';
 import StudyGroups from './components/StudyGroups';
 import Chat from './components/Chat';
 import Sessions from './components/Sessions';
-import SharedFiles from './components/SharedFiles';
 import AdminPanel from './components/AdminPanel';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ActiveView } from './types';
-import { currentUser, adminUser } from './data/mockData';
+import { ActiveView, User } from './types';
 import Friends from './components/Friends';
 
 type RealGroup = {
@@ -38,14 +36,71 @@ const queryClient = new QueryClient({
 type AuthPage = 'login' | 'signup';
 
 // ─── Authenticated app shell ──────────────────────────────────────────────────
+// Decode current user from JWT token
+// function getTokenUser() {
+//   try {
+//     const token = localStorage.getItem('token');
+//     if (!token) return { name: 'User', role: 'student', avatar: 'U' };
+//     const payload = JSON.parse(atob(token.split('.')[1]));
+//     const name = payload.username || payload.name || 'User';
+//     return { name, role: "student", avatar: name.slice(0, 2).toUpperCase(), id: payload.Uid };
+//   } catch { return { name: 'User', role: "student" , avatar: 'U' }; }
+// }
+function getTokenUser(): User {
+  try {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      return {
+        id: 'guest',
+        name: 'User',
+        role: 'student',
+        avatar: 'U',
+        email: '',
+        department: '',
+        year: 0,
+        joinedAt: ''
+      };
+    }
+
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const name = payload.username || payload.name || 'User';
+
+    return {
+      id: payload.Uid ?? 'guest',
+      name,
+      role: 'student',
+      avatar: name.slice(0, 2).toUpperCase(),
+      email: '',
+      department: '',
+      year: 0,
+      joinedAt: ''
+    };
+
+  } catch {
+    return {
+      id: 'guest',
+      name: 'User',
+      role: 'student',
+      avatar: 'U',
+      email: '',
+      department: '',
+      year: 0,
+      joinedAt: ''
+    };
+  }
+}
 function AuthenticatedApp() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
-  const [user, setUser] = useState(currentUser);
+  const [user, setUser] = useState<User>(getTokenUser);
   const [selectedGroup, setSelectedGroup] = useState<RealGroup | null>(null);
   const { logout } = useAuth();
 
   const toggleRole = () => {
-    setUser(u => (u.role === 'student' ? adminUser : currentUser));
+    setUser(prev => ({
+      ...prev,
+      role: prev.role === 'admin' ? 'student' : 'admin'
+    }));
   };
 
   const handleLogout = () => {
@@ -60,9 +115,8 @@ function AuthenticatedApp() {
       case 'groups':    return <StudyGroups setActiveView={setActiveView} setSelectedGroup={setSelectedGroup} />;
       case 'chat':      return <Chat selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} />;
       case 'sessions':  return <Sessions />;
-      case 'files':     return <SharedFiles />;
-      case 'admin':     return user.role === 'admin' ? <AdminPanel /> : <Dashboard setActiveView={setActiveView} />;
       case 'friends':   return <Friends />;
+      case 'admin': return <AdminPanel/>;
       default:          return <Dashboard setActiveView={setActiveView} />;
     }
   };
@@ -72,7 +126,7 @@ function AuthenticatedApp() {
       <Sidebar
         activeView={activeView}
         setActiveView={setActiveView}
-        currentUser={user}
+        currentUser={user as User}
         onRoleSwitch={toggleRole}
         onLogout={handleLogout}
       />

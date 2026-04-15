@@ -160,7 +160,10 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
         body: formData,
       });
       
-      if (!uploadRes.ok) throw new Error('Upload failed');
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message || 'Upload failed');
+      }
       const uploadData = await uploadRes.json();
       
       const fileUrl = uploadData.url;
@@ -177,12 +180,15 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
         }),
       });
       
-      if (!msgRes.ok) throw new Error('Failed to send file message');
+      if (!msgRes.ok) {
+        const errData = await msgRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to send file message');
+      }
       
-      showToast('File uploaded automatically', 'success');
+      showToast('File uploaded successfully', 'success');
       refetchChat();
-    } catch {
-      showToast('Failed to upload file.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to upload file.', 'error');
     } finally {
       setIsUploading(false);
       // Reset input
@@ -502,7 +508,7 @@ const Chat: React.FC<ChatProps> = ({ selectedGroup, setSelectedGroup }) => {
             {/* Input */}
             <div className="px-6 py-4 flex-shrink-0" style={{ background: '#1A1F2E', borderTop: '1px solid #1E2A3A' }}>
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: '#111827', border: '1px solid #2A3A50' }}>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".jpg,.jpeg,.txt,.pdf" />
                 <button 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
