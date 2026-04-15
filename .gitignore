@@ -1,2 +1,5 @@
 /backend/node_modules
+/backend/uploads
+/Frontend_final/build
 /Frontend_final/node_modules
+
