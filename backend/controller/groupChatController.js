@@ -381,7 +381,8 @@ export async function create_groupChat(req,res){
         newGroup.group_members.push(userId);
         newGroup.messages = [];
         newGroup.group_name = name;
-        newGroup.requires_permission = requires_permission === true; // ensure boolean
+        newGroup.requires_permission = requires_permission === true;
+        newGroup.createdBy = String(userId);
 
         if (subject != null) {
             newGroup.group_subject = subject;
@@ -413,6 +414,11 @@ export async function  delete_groupChat(req,res) {
         if(!group){
             return res.status(404).json({
                 error :  " group not found"
+            });
+        }
+        if (group.createdBy && String(group.createdBy) !== userId) {
+            return res.status(403).json({
+                error: "only the creator can delete this group"
             });
         }
         if(!group.group_admins.map(String)?.includes(userId)){

@@ -38,9 +38,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
 
   const stats = [
     { label: 'Groups Joined',     value: groupsQuery.isLoading  ? '…' : totalGroups,   icon: Users,         color: '#FFB800', bg: 'rgba(255,184,0,0.1)' },
-    { label: 'Sessions',          value: sessionsQuery.isLoading ? '…' : totalSessions, icon: Calendar,      color: '#00D4AA', bg: 'rgba(0,212,170,0.1)' },
-    { label: 'Study Hours',       value: totalSessions * 2,                              icon: TrendingUp,    color: '#F97316', bg: 'rgba(249,115,22,0.1)' },
-    { label: 'Messages',          value: '—',                                            icon: MessageSquare, color: '#7C3AED', bg: 'rgba(124,58,237,0.1)' },
+    { label: 'Upcoming Sessions', value: sessionsQuery.isLoading ? '…' : upcomingSessions.length, icon: Calendar,      color: '#00D4AA', bg: 'rgba(0,212,170,0.1)' },
+    { label: 'Study Sessions',    value: totalSessions,                              icon: TrendingUp,    color: '#F97316', bg: 'rgba(249,115,22,0.1)' },
+    { label: 'Files Shared',     value: '—',                                            icon: MessageSquare, color: '#7C3AED', bg: 'rgba(124,58,237,0.1)' },
   ];
 
   return (

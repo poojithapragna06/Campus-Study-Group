@@ -107,9 +107,12 @@ export async function apiCreateGroup(payload: {
 export async function apiDeleteGroup(groupChatId: string) {
   const res = await fetch('http://localhost:5000/api/groups/delete-group', {
     method: 'POST',
-      headers: { 'Content-Type': 'application/json',authorization: `Bearer ${localStorage.getItem("token")}`, },
+    headers: { 'Content-Type': 'application/json', authorization: `Bearer ${localStorage.getItem("token")}` },
     body: JSON.stringify({ groupChatId }),
   });
-  if (!res.ok) throw new Error('Failed to delete group');
+  if (!res.ok) {
+    if (res.status === 403) throw new Error('Only the group creator can delete this group');
+    throw new Error('Failed to delete group');
+  }
   return res.json();
 }

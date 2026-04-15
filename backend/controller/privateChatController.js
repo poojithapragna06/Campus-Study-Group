@@ -123,32 +123,20 @@ export async function uploadFileMessage(req, res) {
             });
         }
 
-        const isRaw = req.file.originalname.match(/\.(pdf|zip|rar|tar|gz|txt|docx|doc|xls|xlsx|csv)$/i);
-        
-        let finalUrl = "";
-        
-        if (isRaw) {
-            // Bypass Cloudinary completely for PDFs/Docs
-            const ext = path.extname(req.file.originalname);
-            const newFilename = `${req.file.filename}${ext}`;
-            const newPath = path.join(req.file.destination, newFilename);
-            fs.renameSync(req.file.path, newPath);
-            
-            finalUrl = `http://localhost:5000/uploads/${newFilename}`;
-        } else {
-            // Upload images/videos to Cloudinary as normal
-            const result = await cloudinary.uploader.upload(req.file.path, {
-                resource_type: "raw",
-                folder: "campus_study_chat",
-                public_id: `${Date.now()}_${req.file.originalname.replace(/\.[^.]+$/, "")}`,
-            });
-            finalUrl = result.secure_url;
-            
-            // Clean up the temp file
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (_) {}
-        }
+        // Upload all files to Cloudinary (no local bypass)
+        const result = await cloudinary.uploader.upload(req.file.path, {
+            resource_type: "auto",
+            folder: "campus_study_chat",
+            // Preserve extension for browser identification
+            public_id: `${Date.now()}_${req.file.originalname.replace(/[^a-z0-9.]/gi, '_')}`,
+        });
+
+        const finalUrl = result.secure_url;
+
+        // Clean up the temp file
+        try {
+            fs.unlinkSync(req.file.path);
+        } catch (_) {}
 
         const chatId = getChatId(userId, friendId);
 

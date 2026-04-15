@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
   Shield, Users, BookOpen, MessageSquare, FolderOpen,
-  AlertTriangle, Trash2, Ban, CheckCircle, TrendingUp, Activity, Eye,
+  Trash2, Ban, CheckCircle, TrendingUp, Activity, Eye,
 } from 'lucide-react';
-import { messages, sharedFiles } from '../data/mockData';
 import { useAllGroups, useUsers, useDeleteUser, useDeleteRealGroup } from '../hooks/useQueries';
 import { LoadingSpinner, ErrorState } from './ui';
 
@@ -11,21 +10,35 @@ type Tab = 'overview' | 'groups' | 'users' | 'content';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const groupsQuery = useAllGroups();
   const usersQuery  = useUsers();
   const deleteUser  = useDeleteUser();
   const deleteGroup = useDeleteRealGroup();
 
-  // Backend returns { status: 'ok', result: GroupChat[] }
   const groups: any[] = groupsQuery.data?.result ?? [];
   const users: any[] = usersQuery.data ?? [];
+
+  const currentUserId = (() => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return '';
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return String(payload.Uid);
+    } catch { return ''; }
+  })();
 
   const stats = [
     { label: 'Total Users',   value: users.length,   icon: Users,        color: '#FFB800', delta: '+12%' },
     { label: 'Active Groups', value: groups.length,  icon: BookOpen,     color: '#00D4AA', delta: '+3%'  },
-    { label: 'Messages Today',value: messages.length, icon: MessageSquare,color: '#7C3AED', delta: '+28%' },
-    { label: 'Files Shared',  value: sharedFiles.length, icon: FolderOpen, color: '#F97316', delta: '+7%' },
+    { label: 'Messages Today',value: '—',            icon: MessageSquare,color: '#7C3AED', delta: 'Real-time' },
+    { label: 'Files Shared',  value: '—',            icon: FolderOpen, color: '#F97316', delta: 'Cloudinary' },
   ];
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -255,13 +268,21 @@ const AdminPanel: React.FC = () => {
                     <button
                       onClick={() => {
                         if(window.confirm(`Delete group "${group.group_name}"?`)) {
-                          deleteGroup.mutate(group._id);
+                          deleteGroup.mutate(group._id, {
+                            onSuccess: () => showToast('Group deleted', 'success'),
+                            onError: (err: any) => showToast(err.message || 'Failed to delete group', 'error')
+                          });
                         }
                       }}
-                      disabled={deleteGroup.isPending}
-                      title="Delete Group"
+                      disabled={deleteGroup.isPending || (group.createdBy && String(group.createdBy) !== currentUserId)}
+                      title={group.createdBy && String(group.createdBy) !== currentUserId ? "Only the creator can delete" : "Delete Group"}
                       className="p-1.5 rounded-lg transition-opacity hover:opacity-70"
-                      style={{ background: '#1E2A3A', color: '#EF4444' }}
+                      style={{ 
+                        background: '#1E2A3A', 
+                        color: '#EF4444',
+                        opacity: (group.createdBy && String(group.createdBy) !== currentUserId) ? 0.3 : 1,
+                        cursor: (group.createdBy && String(group.createdBy) !== currentUserId) ? 'not-allowed' : 'pointer'
+                      }}
                     >
                       <Trash2 size={12} />
                     </button>
@@ -327,13 +348,13 @@ const AdminPanel: React.FC = () => {
                   >
                     <Ban size={12} />
                   </button>
-                  <button
-                    onClick={() => {
-                      if(window.confirm(`Delete user "${user.name}"?`)) {
-                        deleteUser.mutate(user.id);
-                      }
-                    }}
-                    disabled={deleteUser.isPending}
+                    <button
+                      onClick={() => {
+                        if(window.confirm(`Delete user "${user.name ?? user.username}"?`)) {
+                          deleteUser.mutate(user.userID);
+                        }
+                      }}
+                      disabled={deleteUser.isPending}
                     className="p-1.5 rounded-lg transition-opacity hover:opacity-70"
                     style={{ background: '#1E2A3A', color: '#EF4444' }}
                   >
@@ -399,6 +420,18 @@ const AdminPanel: React.FC = () => {
           </div>
         </div>
       )} */}
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-50 px-4 py-3 rounded-xl text-sm font-medium animate-[fadeIn_0.2s_ease-out]"
+          style={{ 
+            background: toast.type === 'success' ? 'rgba(0,212,170,0.1)' : 'rgba(239,68,68,0.1)', 
+            border: `1px solid ${toast.type === 'success' ? '#00D4AA40' : '#EF444440'}`, 
+            color: toast.type === 'success' ? '#00D4AA' : '#EF4444',
+            minWidth: 240 
+          }}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 };

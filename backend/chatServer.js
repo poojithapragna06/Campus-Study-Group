@@ -7,6 +7,13 @@ import Redis from "ioredis";
 import { GroupChat } from "./models/groupChat.js";
 import { sql } from "./dbUtils/sql_utl/sql_connector.js";
 import { connectToDatabase } from './dbUtils/mongoConnect.js';
+import { PrivateChat } from "./models/privateChat.js";
+
+function getChatId(userId1, userId2) {
+    const a = String(userId1);
+    const b = String(userId2);
+    return a < b ? `${a}_${b}` : `${b}_${a}`;
+}
 
 await connectToDatabase();
 
@@ -83,6 +90,64 @@ io.on("connection", async (socket) => {
         // and please see the message structure in the group chat model for corrrect frontend call
         group.messages.push(message);
         await group.save();
+    });
+
+    // ── PRIVATE CHAT EVENTS ────────────────────────────────────────────────
+    socket.on("join-private-chat", async ({ friendId, jwt: token }) => {
+        try {
+            const decoded = jwtLib.verify(token, process.env.JWT_SECRET || 'MOKSHU_SECRET');
+            const userId = decoded.Uid;
+            const chatId = getChatId(userId, friendId);
+            socket.join(chatId);
+
+            console.log(`User ${userId} joined private chat ${chatId}`);
+
+            // Fetch history from Redis or Mongo
+            const raw = await redis.lrange(chatId, 0, -1);
+            let history;
+            if (raw.length > 0) {
+                history = raw.map(r => JSON.parse(r));
+            } else {
+                let chat = await PrivateChat.findOne({ chat_id: chatId });
+                if (!chat) {
+                    chat = new PrivateChat({ chat_id: chatId, messages: [] });
+                    await chat.save();
+                }
+                history = chat.messages;
+                for (const msg of history) {
+                    await redis.rpush(chatId, JSON.stringify(msg));
+                }
+            }
+            socket.emit("private-chat-history", history);
+        } catch (err) {
+            socket.emit("error", { error: "Failed to join private chat" });
+        }
+    });
+
+    socket.on("send-private-message", async ({ friendId, message, jwt: token }) => {
+        try {
+            const decoded = jwtLib.verify(token, process.env.JWT_SECRET || 'MOKSHU_SECRET');
+            const userId = decoded.Uid;
+            const chatId = getChatId(userId, friendId);
+
+            message.message_id = generateUUID();
+            message.sender_id = userId; // Ensure sender_id is set correctly from token
+
+            // Emit to the other user in the room
+            socket.to(chatId).emit("receive-private-message", message);
+
+            // Persist to Redis
+            await redis.rpush(chatId, JSON.stringify(message));
+
+            // Persist to Mongo
+            const chat = await PrivateChat.findOne({ chat_id: chatId });
+            if (chat) {
+                chat.messages.push(message);
+                await chat.save();
+            }
+        } catch (err) {
+            console.error(err);
+        }
     });
 
     socket.on("delete-post", async ({ groupChatId, jwt: token, postId }) => {
