@@ -1,15 +1,25 @@
 import { PrivateChat } from "../models/privateChat.js";
 import { sql } from "../dbUtils/sql_utl/sql_connector.js";
 import { v2 as cloudinary } from "cloudinary";
-import fs from "fs";
-import path from "path";
+import streamifier from "streamifier";
 
 // ── Configure Cloudinary ─────────────────────────────────────────────────────
 cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME  ,
     api_key: process.env.CLOUDINARY_API_KEY ,
     api_secret: process.env.CLOUDINARY_API_SECRET, 
 });
+
+// Helper: upload buffer to Cloudinary via stream
+function uploadStream(buffer, options) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
+            if (err) return reject(err);
+            resolve(result);
+        });
+        streamifier.createReadStream(buffer).pipe(stream);
+    });
+}
 
 // Helper: generate deterministic chat_id for two users
 function getChatId(userId1, userId2) {
@@ -123,8 +133,8 @@ export async function uploadFileMessage(req, res) {
             });
         }
 
-        // Upload all files to Cloudinary (no local bypass)
-        const result = await cloudinary.uploader.upload(req.file.path, {
+        // Upload to Cloudinary via stream (no temp files on disk)
+        const result = await uploadStream(req.file.buffer, {
             resource_type: "auto",
             folder: "campus_study_chat",
             // Preserve extension for browser identification
@@ -132,11 +142,6 @@ export async function uploadFileMessage(req, res) {
         });
 
         const finalUrl = result.secure_url;
-
-        // Clean up the temp file
-        try {
-            fs.unlinkSync(req.file.path);
-        } catch (_) {}
 
         const chatId = getChatId(userId, friendId);
 
@@ -166,10 +171,6 @@ export async function uploadFileMessage(req, res) {
         });
     } catch (e) {
         console.error(e);
-        // Clean up temp file on error
-        if (req.file?.path) {
-            try { fs.unlinkSync(req.file.path); } catch (_) {}
-        }
         return res.status(500).json({ status: "error", message: "Internal server error" });
     }
 }

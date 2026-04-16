@@ -7,11 +7,7 @@ import groupRoutes from './routes/groupRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 import { connectToDatabase } from './dbUtils/mongoConnect.js';
@@ -24,9 +20,6 @@ import { connectToDatabase } from './dbUtils/mongoConnect.js';
 app.use(cookieParser());
 app.use(cors(corsOptions));
 app.use(express.json());
-
-// Serve static uploads
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 await connectToDatabase();
 
