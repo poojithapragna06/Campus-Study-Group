@@ -14,7 +14,7 @@ Follow these steps to set up and run the project locally:
 Open PowerShell (or terminal) and run:
 
 ```bash
-docker compose up -d
+docker compose -f "compose.yaml" up -d
 ```
 
  Make sure you are in the same directory as `compose.yaml`
