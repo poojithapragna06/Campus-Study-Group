@@ -1,88 +1,182 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
+import useAuthUser from "../hooks/useAuthUser";
+import MessageCard from "../components/MessageCard.jsx";
 
-export default function ChatPage({ userId }) {
-  const { id: friendId } = useParams();
+const socket = io("http://localhost:5002");
+
+// 🔥 correct type detection from File
+const getFileTypeFromFile = (file) => {
+  const type = file.type;
+
+  if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+  if (type === "application/pdf") return "pdf";
+
+  return "other";
+};
+
+// 🔥 upload function
+const uploadToCloudinary = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", "chat_uploads");
+
+  console.log("Uploading:", file.name);
+
+  const res = await fetch(
+    "https://api.cloudinary.com/v1_1/ddj28rrje/auto/upload",
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+
+  const data = await res.json();
+
+  if (!data.secure_url) {
+    throw new Error("Upload failed");
+  }
+
+  const file_type = getFileTypeFromFile(file); // ✅ FIXED
+
+  console.log("Uploaded:", data.secure_url, file_type);
+
+  return {
+    url: data.secure_url,
+    type: file_type
+  };
+};
+
+const ChatPage = () => {
+  const { isLoading, authUser } = useAuthUser();
+  const { id: groupChatId } = useParams();
+
+  const userId = authUser?.userID;
+
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const roomIdRef = useRef("");
-  const socketRef = useRef(null);
-  const endRef = useRef(null);
+  const [content, setContent] = useState("");
+  const [files, setFiles] = useState([]);
 
-  const getRoomId = (a, b) => [a, b].sort().join("-");
+  const bottomRef = useRef();
 
+  // 🔥 JOIN + LISTEN
   useEffect(() => {
-    const roomId = getRoomId(userId, friendId);
-    roomIdRef.current = roomId;
+    if (!groupChatId) return;
 
-    const socket = io("http://localhost:5002");
-    socketRef.current = socket;
-    socket.emit("join-chat", { roomId });
+    socket.emit("join-group-chat", { groupChatId });
 
-    socket.on("chat-history", (history) => setMessages(history));
-    socket.on("receive-message", (msg) => setMessages((prev) => [...prev, msg]));
+    socket.on("chat-history", (history) => {
+      setMessages(history);
+    });
 
-    return () => socket.disconnect();
-  }, [userId, friendId]);
+    socket.on("receive-message", (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
 
+    return () => {
+      socket.off("chat-history");
+      socket.off("receive-message");
+    };
+  }, [groupChatId]);
+
+  // 🔥 AUTO SCROLL
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    const msg = {
-      senderId: userId,
-      receiverId: friendId,
-      text: input,
-      timestamp: new Date().toISOString(),
+  // 🔥 SEND MESSAGE
+  const handleSend = async () => {
+    console.log("SEND CLICKED", files);
+
+    if (!content && files.length === 0) return;
+
+    let fetchables = [];
+
+    try {
+      fetchables = await Promise.all(
+        files.map((file) => uploadToCloudinary(file))
+      );
+    } catch (err) {
+      console.error("Upload error:", err);
+      return; // stop if upload fails
+    }
+
+    const message = {
+      message_id: Date.now().toString(),
+      sender_id: userId,
+      content,
+      fetchables,
+      timestamp: new Date().toISOString()
     };
-    setMessages((prev) => [...prev, msg]);
-    socketRef.current.emit("send-message", { roomId: roomIdRef.current, message: msg });
-    setInput("");
+
+    socket.emit("send-message", {
+      groupChatId,
+      message
+    });
+
+    setMessages((prev) => [...prev, message]);
+
+    setContent("");
+    setFiles([]);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        Loading...
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-screen">
-      {/* chat history */}
-      <div className="flex-1 bg-gray-100 p-4 overflow-y-auto space-y-2">
+    <div className="flex flex-col h-full">
+
+      {/* MESSAGES */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex flex-col ${
-              msg.senderId === userId ? "items-end" : "items-start"
-            }`}
-          >
-            <div
-              className={`p-2 rounded max-w-xs whitespace-pre-wrap ${
-                msg.senderId === userId ? "bg-blue-500 text-white" : "bg-gray-300 text-black"
-              }`}
-            >
-              <div>{msg.text}</div>
-              <div className="text-xs text-right opacity-60 mt-1">
-                {new Date(msg.timestamp).toLocaleTimeString()}
-              </div>
-            </div>
-          </div>
+          <MessageCard
+            key={msg.message_id || idx}
+            msg={msg}
+            isOwn={msg.sender_id === userId}
+          />
         ))}
-        <div ref={endRef} />
+        <div ref={bottomRef} />
       </div>
 
-      {/* input bar */}
-      <div className="p-4 bg-gray-800 flex">
+      {/* INPUT */}
+      <div className="p-4 border-t flex gap-2">
+
         <input
           type="text"
-          placeholder="Type a message…"
-          className="input input-bordered flex-1 mr-2"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          className="input input-bordered flex-1"
+          placeholder="Type message..."
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
         />
-        <button className="btn btn-primary" onClick={sendMessage}>
+
+        <input
+          type="file"
+          multiple
+          onChange={(e) => {
+            const selected = Array.from(e.target.files);
+            console.log("FILES SELECTED:", selected);
+            setFiles(selected);
+          }}
+        />
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleSend}
+        >
           Send
         </button>
       </div>
     </div>
   );
-}
+};
+
+export default ChatPage;
