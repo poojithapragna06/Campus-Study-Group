@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { io } from "socket.io-client";
 
 const socket = io("http://localhost:5002");
@@ -13,7 +13,7 @@ const ChatPage = ({ userId }) => {
 
   const bottomRef = useRef();
 
-  // 🔥 JOIN + LISTEN
+  // Join group and listen for messages
   useEffect(() => {
     socket.emit("join-group-chat", { groupChatId });
 
@@ -31,17 +31,16 @@ const ChatPage = ({ userId }) => {
     };
   }, [groupChatId]);
 
-  // 🔥 AUTO SCROLL
+  // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 🔥 SEND MESSAGE
+  // Send message handler
   const handleSend = async () => {
     if (!content && files.length === 0) return;
 
     const fetchables = [];
-
     for (const file of files) {
       const base64 = await toBase64(file);
       fetchables.push(base64);
@@ -51,83 +50,113 @@ const ChatPage = ({ userId }) => {
       sender_id: userId,
       content,
       fetchables,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    socket.emit("send-message", {
-      groupChatId,
-      message
-    });
+    socket.emit("send-message", { groupChatId, message });
 
-    // optimistic UI
+    // Optimistic UI update
     setMessages((prev) => [...prev, message]);
-
     setContent("");
     setFiles([]);
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="chat-page bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8">
+      <div className="chat-container container mx-auto space-y-6">
 
-      {/* MESSAGES */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((msg, idx) => (
-          <div
-            key={msg.message_id || idx}
-            className={`chat ${
-              msg.sender_id === userId ? "chat-end" : "chat-start"
-            }`}
-          >
-            <div className="chat-bubble">
+        {/* Header */}
+        <div className="chat-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h2 className="chat-title text-2xl sm:text-3xl font-bold tracking-tight">
+            Group Chat
+          </h2>
+          <Link to="/" className="btn btn-outline btn-sm">
+            Back to Groups
+          </Link>
+        </div>
 
-              {/* TEXT */}
-              {msg.content && <p>{msg.content}</p>}
+        {/* Chat window */}
+        <div className="chat-window bg-white rounded-lg shadow flex flex-col h-[70vh]">
+          
+          {/* Messages list */}
+          <div className="messages-list flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((msg, idx) => (
+              <div
+                key={msg.message_id || idx}
+                className={`message-row flex items-end ${
+                  msg.sender_id === userId ? "justify-end" : "justify-start"
+                }`}
+              >
+                {/* Avatar for other users */}
+                {msg.sender_id !== userId && (
+                  <div className="message-avatar w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center mr-2 text-white font-bold">
+                    {msg.sender_id?.[0]?.toUpperCase()}
+                  </div>
+                )}
 
-              {/* FILES */}
-              {msg.fetchables?.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {msg.fetchables.map((file, i) => (
-                    <img
-                      key={i}
-                      src={file}
-                      alt="upload"
-                      className="max-w-xs rounded"
-                    />
-                  ))}
+                {/* Message bubble */}
+                <div
+                  className={`message-bubble max-w-xs px-3 py-2 rounded-lg shadow-md transition hover:shadow-lg ${
+                    msg.sender_id === userId
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-black"
+                  }`}
+                >
+                  {/* Text content */}
+                  {msg.content && <p>{msg.content}</p>}
+
+                  {/* File previews */}
+                  {msg.fetchables?.length > 0 && (
+                    <div className="message-files mt-2 grid grid-cols-2 gap-2">
+                      {msg.fetchables.map((file, i) => (
+                        <img
+                          key={i}
+                          src={file}
+                          alt="upload"
+                          className="file-preview rounded border hover:scale-105 transition-transform"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Timestamp */}
+                  <div className="message-time text-[10px] opacity-70 mt-1 text-right">
+                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
                 </div>
-              )}
-
-              {/* TIME */}
-              <div className="text-[10px] opacity-60 mt-1">
-                {new Date(msg.timestamp).toLocaleTimeString()}
               </div>
-
-            </div>
+            ))}
+            <div ref={bottomRef} />
           </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* INPUT */}
-      <div className="p-4 border-t flex gap-2">
+          {/* Input bar */}
+          <div className="chat-input p-4 border-t flex gap-2 items-center bg-gray-50">
+            <input
+              type="text"
+              className="message-text input input-bordered flex-1 rounded-full"
+              placeholder="Type a message..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
 
-        <input
-          type="text"
-          className="input input-bordered flex-1"
-          placeholder="Type message..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
+            <label className="attach-button btn btn-ghost btn-circle">
+              📎
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => setFiles([...e.target.files])}
+              />
+            </label>
 
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setFiles([...e.target.files])}
-        />
-
-        <button className="btn btn-primary" onClick={handleSend}>
-          Send
-        </button>
+            <button className="send-button btn btn-primary btn-circle" onClick={handleSend}>
+              ➤
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -135,8 +164,7 @@ const ChatPage = ({ userId }) => {
 
 export default ChatPage;
 
-
-// 🔧 helper
+// Helper function
 function toBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -145,6 +173,153 @@ function toBase64(file) {
     reader.onerror = reject;
   });
 }
+// import { useEffect, useRef, useState } from "react";
+// import { useParams } from "react-router-dom";
+// import { io } from "socket.io-client";
+
+// const socket = io("http://localhost:5002");
+
+// const ChatPage = ({ userId }) => {
+//   const { id: groupChatId } = useParams();
+
+//   const [messages, setMessages] = useState([]);
+//   const [content, setContent] = useState("");
+//   const [files, setFiles] = useState([]);
+
+//   const bottomRef = useRef();
+
+//   // 🔥 JOIN + LISTEN
+//   useEffect(() => {
+//     socket.emit("join-group-chat", { groupChatId });
+
+//     socket.on("chat-history", (history) => {
+//       setMessages(history);
+//     });
+
+//     socket.on("receive-message", (msg) => {
+//       setMessages((prev) => [...prev, msg]);
+//     });
+
+//     return () => {
+//       socket.off("chat-history");
+//       socket.off("receive-message");
+//     };
+//   }, [groupChatId]);
+
+//   // 🔥 AUTO SCROLL
+//   useEffect(() => {
+//     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+//   }, [messages]);
+
+//   // 🔥 SEND MESSAGE
+//   const handleSend = async () => {
+//     if (!content && files.length === 0) return;
+
+//     const fetchables = [];
+
+//     for (const file of files) {
+//       const base64 = await toBase64(file);
+//       fetchables.push(base64);
+//     }
+
+//     const message = {
+//       sender_id: userId,
+//       content,
+//       fetchables,
+//       timestamp: new Date().toISOString()
+//     };
+
+//     socket.emit("send-message", {
+//       groupChatId,
+//       message
+//     });
+
+//     // optimistic UI
+//     setMessages((prev) => [...prev, message]);
+
+//     setContent("");
+//     setFiles([]);
+//   };
+
+//   return (
+//     <div className="flex flex-col h-full">
+
+//       {/* MESSAGES */}
+//       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+//         {messages.map((msg, idx) => (
+//           <div
+//             key={msg.message_id || idx}
+//             className={`chat ${
+//               msg.sender_id === userId ? "chat-end" : "chat-start"
+//             }`}
+//           >
+//             <div className="chat-bubble">
+
+//               {/* TEXT */}
+//               {msg.content && <p>{msg.content}</p>}
+
+//               {/* FILES */}
+//               {msg.fetchables?.length > 0 && (
+//                 <div className="mt-2 space-y-2">
+//                   {msg.fetchables.map((file, i) => (
+//                     <img
+//                       key={i}
+//                       src={file}
+//                       alt="upload"
+//                       className="max-w-xs rounded"
+//                     />
+//                   ))}
+//                 </div>
+//               )}
+
+//               {/* TIME */}
+//               <div className="text-[10px] opacity-60 mt-1">
+//                 {new Date(msg.timestamp).toLocaleTimeString()}
+//               </div>
+
+//             </div>
+//           </div>
+//         ))}
+//         <div ref={bottomRef} />
+//       </div>
+
+//       {/* INPUT */}
+//       <div className="p-4 border-t flex gap-2">
+
+//         <input
+//           type="text"
+//           className="input input-bordered flex-1"
+//           placeholder="Type message..."
+//           value={content}
+//           onChange={(e) => setContent(e.target.value)}
+//         />
+
+//         <input
+//           type="file"
+//           multiple
+//           onChange={(e) => setFiles([...e.target.files])}
+//         />
+
+//         <button className="btn btn-primary" onClick={handleSend}>
+//           Send
+//         </button>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default ChatPage;
+
+
+// // 🔧 helper
+// function toBase64(file) {
+//   return new Promise((resolve, reject) => {
+//     const reader = new FileReader();
+//     reader.readAsDataURL(file);
+//     reader.onload = () => resolve(reader.result);
+//     reader.onerror = reject;
+//   });
+// }
 
 
 
